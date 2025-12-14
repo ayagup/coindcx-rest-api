@@ -1,0 +1,3052 @@
+openapi: 3.0.0
+info:
+  contact:
+    email: legal@coindcx.com
+  description: "Welcome to the CoinDCX API!\n\nThe base URL for the API calls is `https://api.coindcx.com`,\
+    \ base URL for some public endpoint is `https://public.coindcx.com`.\n\n## Important\
+    \ Legal Notice\n\nThese API License Terms and Conditions govern the use of any\
+    \ 'Market Data' and Application Programming Interface (API) of CoinDCX. \nBy accessing\
+    \ any CoinDCX API, Market Data and/or any other information, service, or feature,\
+    \ you shall be bound by these Terms.\n\n## Key Definitions\n\n- **Market Data**:\
+    \ All data related to trading activity on CoinDCX platforms, including prices,\
+    \ quantities of orders and transactions\n- **CoinDCX API**: Public API and/or\
+    \ any data, information related to trading activity made available through https://docs.coindcx.com/\n\
+    - **Algorithmic Trading**: Method using computer programs following defined instructions\
+    \ or algorithms to place trades\n- **High-Frequency Trading**: Type of algorithmic\
+    \ trading with high speeds, high turnover rates, and high order-to-trade ratios\n\
+    \n## License Grant\n\nUsers are granted a **non-exclusive, non-transferable, non-assignable,\
+    \ non-sublicensable, revocable, restricted license** for usage only.\n\nUsers\
+    \ must NOT:\n- Alter, manipulate, or misrepresent any CoinDCX API or Market Data\n\
+    - Reverse engineer, decompile, or disassemble the API\n- Redistribute, display,\
+    \ or disseminate Market Data to any third party\n\n## Fees and Charges\n\nCurrently\
+    \ no fees are charged for API usage. However, CoinDCX reserves the right to charge\
+    \ fees in the future.\n\n## Disclaimer\n\nTHE COINDCX API AND MARKET DATA ARE\
+    \ PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTY OF ANY KIND. \nCoinDCX\
+    \ does not warrant that the API will be safe, uninterrupted, error-free, or protected\
+    \ against threats.\n\n## Limitation of Liability\n\nMaximum aggregate liability\
+    \ of CoinDCX shall not exceed INR 1,00,000 (Rupees One lakh only).\n\n## Governing\
+    \ Law\n\nThese Terms are governed by the laws of India. Disputes shall be resolved\
+    \ through arbitration in Mumbai, India.\n\n## Authentication\n\nAll authenticated\
+    \ API calls use POST method and parameters are passed as JSON in the request body.\n\
+    \nThe authentication procedure:\n- The payload is the parameters object, JSON\
+    \ encoded\n- The signature is the hex digest of an HMAC-SHA256 hash where the\
+    \ message is your payload, and the secret key is your API secret\n\nRequired headers\
+    \ for authenticated requests:\n- X-AUTH-APIKEY: your-api-key\n- X-AUTH-SIGNATURE:\
+    \ signature\n\n## Important Notes\n\n- All authenticated endpoints require a timestamp\
+    \ parameter\n- Timestamps are used to validate request freshness\n- Maximum of\
+    \ 25 open orders at a time for one specific market\n- Every request must contain\
+    \ a timestamp of when it was generated\n"
+  license:
+    name: CoinDCX API License Terms and Conditions
+    url: https://coindcx.com/api-dashboard
+  termsOfService: https://docs.coindcx.com/#terms-and-conditions
+  title: CoinDCX API
+  version: 1.0.0
+servers:
+- description: Main API server
+  url: https://api.coindcx.com
+- description: Public data server
+  url: https://public.coindcx.com
+security:
+- ApiKeyAuth: []
+  SignatureAuth: []
+tags:
+- description: Public endpoints that don't require authentication
+  name: Public
+- description: User account information
+  name: User
+- description: Order management endpoints
+  name: Order
+- description: Lending/Funding endpoints
+  name: Lend
+- description: Futures trading endpoints for perpetual contracts with leverage
+  name: Futures
+- description: Wallet management and transfer operations between accounts and wallet
+    types
+  name: Wallet
+- description: Margin trading endpoints with leverage for long and short positions
+  name: Margin
+paths:
+  /exchange/ticker:
+    get:
+      description: Returns ticker data for all markets. A ticker is generated once
+        every second.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_ticker_get_200_response_inner"
+                type: array
+          description: Successful response
+      summary: Get ticker information
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /exchange/v1/markets:
+    get:
+      description: Returns an array of strings of currently active markets
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                example:
+                - SNTBTC
+                - TRXBTC
+                - TRXETH
+                items:
+                  type: string
+                type: array
+          description: Successful response
+      summary: Get active markets
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /exchange/v1/markets_details:
+    get:
+      description: Returns detailed information about all markets
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_v1_markets_details_get_200_response_inner"
+                type: array
+          description: Successful response
+      summary: Get market details
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /market_data/trade_history:
+    get:
+      description: Returns a sorted list of most recent 30 trades by default
+      parameters:
+      - description: Market pair from Market Details API
+        example: B-BTC_USDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Number of trades to return
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 30
+          maximum: 500
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_market_data_trade_history_get_200_response_inner"
+                type: array
+          description: Successful response
+      servers:
+      - url: https://public.coindcx.com
+      summary: Get trade history
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /market_data/orderbook:
+    get:
+      description: Returns a sorted list of bids and asks
+      parameters:
+      - description: Market pair from Market Details API
+        example: B-BTC_USDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_market_data_orderbook_get_200_response"
+          description: Successful response
+      servers:
+      - url: https://public.coindcx.com
+      summary: Get order book
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /market_data/candles:
+    get:
+      description: Returns candlestick bars for given pair
+      parameters:
+      - description: Market pair from Market Details API
+        example: B-BTC_USDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Candlestick interval
+        explode: true
+        in: query
+        name: interval
+        required: true
+        schema:
+          enum:
+          - 1m
+          - 5m
+          - 15m
+          - 30m
+          - 1h
+          - 2h
+          - 4h
+          - 6h
+          - 8h
+          - 1d
+          - 3d
+          - 1w
+          - 1M
+          type: string
+        style: form
+      - description: Timestamp in milliseconds
+        explode: true
+        in: query
+        name: startTime
+        required: false
+        schema:
+          format: int64
+          type: integer
+        style: form
+      - description: Timestamp in milliseconds
+        explode: true
+        in: query
+        name: endTime
+        required: false
+        schema:
+          format: int64
+          type: integer
+        style: form
+      - description: Number of candles to return
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 500
+          maximum: 1000
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_market_data_candles_get_200_response_inner"
+                type: array
+          description: Successful response
+      servers:
+      - url: https://public.coindcx.com
+      summary: Get candlestick data
+      tags:
+      - Public
+      x-accepts:
+      - application/json
+  /market_data/v3/orderbook/{instrument}-futures/{depth}:
+    get:
+      description: Returns orderbook data for a futures instrument
+      parameters:
+      - description: Futures instrument name
+        example: BTCUSDT
+        explode: false
+        in: path
+        name: instrument
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: Orderbook depth
+        explode: false
+        in: path
+        name: depth
+        required: true
+        schema:
+          enum:
+          - "10"
+          - "20"
+          - "50"
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_market_data_v3_orderbook__instrument__futures__depth__get_200_response"
+          description: Successful response
+      servers:
+      - url: https://public.coindcx.com
+      summary: Get Futures Orderbook
+      tags:
+      - Public
+      - Futures
+      x-accepts:
+      - application/json
+  /market_data/candlesticks:
+    get:
+      description: Returns candlestick data for futures instruments
+      parameters:
+      - description: Trading pair
+        example: BTCUSDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Start timestamp
+        explode: true
+        in: query
+        name: from
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: form
+      - description: End timestamp
+        explode: true
+        in: query
+        name: to
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: form
+      - description: Candle resolution
+        explode: true
+        in: query
+        name: resolution
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: "Product code (f for futures, s for spot)"
+        explode: true
+        in: query
+        name: pcode
+        required: true
+        schema:
+          enum:
+          - f
+          - s
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response with candlestick data
+      servers:
+      - url: https://public.coindcx.com
+      summary: Get Futures Candlesticks
+      tags:
+      - Public
+      - Futures
+      x-accepts:
+      - application/json
+  /exchange/v1/users/balances:
+    post:
+      description: Retrieves account's balances
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_users_balances_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_v1_users_balances_post_200_response_inner"
+                type: array
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get account balances
+      tags:
+      - User
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/users/info:
+    post:
+      description: Retrieves user information
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_users_balances_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_users_info_post_200_response"
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get user info
+      tags:
+      - User
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/create:
+    post:
+      description: Place a new order on the exchange. Maximum of 25 open orders at
+        a time for one specific market.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_create_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_orders_create_post_200_response"
+          description: Order created successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Create new order
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/create_multiple:
+    post:
+      description: "Place multiple orders on the exchange (only supported for CoinDCX\
+        \ INR markets, ecode=I)"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_create_multiple_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_orders_create_multiple_post_200_response"
+          description: Orders created successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Create multiple orders
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/status:
+    post:
+      description: Fetch status of any order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_status_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_orders_create_post_200_response_orders_inner"
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get order status
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/status_multiple:
+    post:
+      description: Fetch status of multiple orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_status_multiple_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get multiple order status
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/active_orders:
+    post:
+      description: Fetch active orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_active_orders_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get active orders
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/trade_history:
+    post:
+      description: Fetch trades associated with your account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_trade_history_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get account trade history
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/active_orders_count:
+    post:
+      description: Fetch count of active orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_active_orders_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_orders_active_orders_count_post_200_response"
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Get active orders count
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/cancel_all:
+    post:
+      description: Cancel multiple active orders in a single API call
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_cancel_all_post_request"
+        required: true
+      responses:
+        "200":
+          description: Orders cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel all orders
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/cancel_by_ids:
+    post:
+      description: Cancel multiple active orders by their IDs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_cancel_by_ids_post_request"
+        required: true
+      responses:
+        "200":
+          description: Orders cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel multiple orders by IDs
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/cancel:
+    post:
+      description: Cancel an active order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_cancel_post_request"
+        required: true
+      responses:
+        "200":
+          description: Order cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel order
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/orders/edit:
+    post:
+      description: Edit the price of an active order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_orders_edit_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Order edited successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Edit order price
+      tags:
+      - Order
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/funding/fetch_orders:
+    post:
+      description: Fetch lending orders and their details (supports pagination)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_funding_fetch_orders_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_v1_funding_fetch_orders_post_200_response_inner"
+                type: array
+          description: Successful response
+      security:
+      - ApiKeyAuth: []
+      summary: Fetch lend orders
+      tags:
+      - Lend
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/funding/lend:
+    post:
+      description: Create a new lending order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_funding_lend_post_request"
+        required: true
+      responses:
+        "200":
+          description: Lend order created successfully
+      security:
+      - ApiKeyAuth: []
+      summary: Create lend order
+      tags:
+      - Lend
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/data/active_instruments:
+    get:
+      description: Retrieve a list of active futures instruments for a specified margin
+        currency mode
+      parameters:
+      - description: Futures margin mode
+        explode: true
+        in: query
+        name: "margin_currency_short_name[]"
+        required: true
+        schema:
+          default: USDT
+          enum:
+          - INR
+          - USDT
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response
+      summary: Get Active Futures Instruments
+      tags:
+      - Futures
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/data/instrument:
+    get:
+      description: Get detailed information about a specific futures instrument
+      parameters:
+      - description: Instrument pair
+        example: B-ETH_USDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: Futures margin mode
+        explode: true
+        in: query
+        name: margin_currency_short_name
+        required: true
+        schema:
+          enum:
+          - INR
+          - USDT
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Successful response with detailed instrument information
+      summary: Get Futures Instrument Details
+      tags:
+      - Futures
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/data/trades:
+    get:
+      description: Retrieve trade history for a specific futures pair
+      parameters:
+      - description: Instrument pair
+        example: B-ETH_USDT
+        explode: true
+        in: query
+        name: pair
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+          description: Successful response
+      summary: Get Futures Trade History
+      tags:
+      - Futures
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/orders:
+    post:
+      description: Retrieve a list of futures orders with pagination
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_orders_post_request"
+        required: true
+      responses:
+        "200":
+          description: Successful response with list of orders
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: List Futures Orders
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/orders/create:
+    post:
+      description: Place a new futures order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_orders_create_post_request"
+        required: true
+      responses:
+        "200":
+          description: Order created successfully
+        "400":
+          description: "Bad request (insufficient funds, invalid price, etc.)"
+        "422":
+          description: Validation error
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Create Futures Order
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/orders/cancel:
+    post:
+      description: Cancel an existing futures order by ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_orders_cancel_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_derivatives_futures_orders_cancel_post_200_response"
+          description: Order cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Cancel Futures Order
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions:
+    post:
+      description: Retrieve futures positions with pagination
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_post_request"
+        required: true
+      responses:
+        "200":
+          description: Successful response with positions list
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: List Futures Positions
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/update_leverage:
+    post:
+      description: Update the leverage for a futures position by pair or position
+        ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_update_leverage_post_request"
+        required: true
+      responses:
+        "200":
+          description: Leverage updated successfully
+        "400":
+          description: "Validation error (leverage < 1x, insufficient funds, etc.)"
+        "422":
+          description: Leverage exceeds maximum or liquidation risk
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Update Position Leverage
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/add_margin:
+    post:
+      description: Add margin to an existing futures position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_add_margin_post_request"
+        required: true
+      responses:
+        "200":
+          description: Margin added successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Add Margin to Position
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/remove_margin:
+    post:
+      description: Remove margin from an existing futures position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_remove_margin_post_request"
+        required: true
+      responses:
+        "200":
+          description: Margin removed successfully
+        "400":
+          description: Insufficient funds
+        "422":
+          description: "Cannot remove margin (inactive position, liquidation risk,\
+            \ etc.)"
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Remove Margin from Position
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/cancel_all_open_orders:
+    post:
+      description: Cancel all open futures orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_cancel_all_open_orders_post_request"
+        required: true
+      responses:
+        "200":
+          description: All orders cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Cancel All Open Orders
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/cancel_all_open_orders_for_position:
+    post:
+      description: Cancel all open orders for a specific position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_cancel_all_open_orders_for_position_post_request"
+        required: true
+      responses:
+        "200":
+          description: All position orders cancelled successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Cancel All Open Orders for Position
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/exit:
+    post:
+      description: Exit (close) a futures position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_cancel_all_open_orders_for_position_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_exit_post_200_response"
+          description: Position exit initiated successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Exit Futures Position
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/create_tpsl:
+    post:
+      description: Create take profit and/or stop loss orders for a position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_create_tpsl_post_request"
+        required: true
+      responses:
+        "200":
+          description: TP/SL orders created successfully
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Create Take Profit and Stop Loss Orders
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/positions/transactions:
+    post:
+      description: Retrieve transaction history for futures positions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_transactions_post_request"
+        required: true
+      responses:
+        "200":
+          description: Successful response with transaction list
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Get Position Transactions
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/derivatives/futures/trades:
+    post:
+      description: Retrieve trade information for futures orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_derivatives_futures_trades_post_request"
+        required: true
+      responses:
+        "200":
+          description: Successful response with trades list
+      security:
+      - ApiKeyAuth: []
+      - SignatureAuth: []
+      summary: Get Futures Trades
+      tags:
+      - Futures
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/create:
+    post:
+      description: |
+        Create a new margin order with leverage for long or short positions.
+
+        **Important Notes:**
+        - Maximum of 10 open orders at a time for one specific market
+        - Set ecode parameter to 'B' for all margin API calls
+        - Leverage allows borrowing capital to increase potential returns
+
+        **Order Types:** market_order, limit_order, stop_limit, take_profit
+
+        **Order Status:** init, partial_entry, open, partial_close, close, cancelled, rejected, triggered
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_create_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_v1_margin_create_post_200_response_inner"
+                type: array
+          description: Successful order placement
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Place Margin Order
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/cancel:
+    post:
+      description: Cancel an existing margin order by its ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_cancel_post_request"
+        required: true
+      responses:
+        "200":
+          description: Order cancelled successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Cancel Margin Order
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/exit:
+    post:
+      description: Exit an existing margin order position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_exit_post_request"
+        required: true
+      responses:
+        "200":
+          description: Order exited successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Exit Margin Order
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/edit_target:
+    post:
+      description: Edit the target price of an existing margin order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_edit_target_post_request"
+        required: true
+      responses:
+        "200":
+          description: Target price updated successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Edit Target Price
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/edit_price_of_target_order:
+    post:
+      description: Edit the price of the target order in a margin position
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_edit_price_of_target_order_post_request"
+        required: true
+      responses:
+        "200":
+          description: Target order price updated successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Edit Price of Target Order
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/edit_sl:
+    post:
+      description: Edit the stop loss price of an existing margin order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_edit_sl_post_request"
+        required: true
+      responses:
+        "200":
+          description: Stop loss updated successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Edit Stop Loss
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/edit_trailing_sl:
+    post:
+      description: Edit the trailing stop loss configuration of an existing margin
+        order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_edit_trailing_sl_post_request"
+        required: true
+      responses:
+        "200":
+          description: Trailing stop loss updated successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Edit Trailing Stop Loss
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/add_margin:
+    post:
+      description: "Add a particular amount to your margin order, decreasing the effective\
+        \ leverage"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_add_margin_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_margin_add_margin_post_200_response"
+          description: Margin added successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Add Margin
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/remove_margin:
+    post:
+      description: "Remove a particular amount from your margin order, increasing\
+        \ the effective leverage"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_remove_margin_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_margin_remove_margin_post_200_response"
+          description: Margin removed successfully
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Remove Margin
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/fetch_orders:
+    post:
+      description: |
+        Fetch margin orders and optionally their details which include all buy/sell related orders.
+
+        **Note:** This API supports pagination. See Pagination section for more details.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_fetch_orders_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/_exchange_v1_margin_fetch_orders_post_200_response_inner"
+                type: array
+          description: Successful response with margin orders
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Fetch Margin Orders
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/margin/order:
+    post:
+      description: Query a specific margin order and optionally its details
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_margin_order_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_margin_fetch_orders_post_200_response_inner"
+          description: Successful response with order details
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Query Margin Order
+      tags:
+      - Margin
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/wallets/sub_account_transfer:
+    post:
+      description: |
+        Transfer funds between master account and its corresponding sub-accounts.
+
+        Supported transfers:
+        - Main account spot wallet to sub-account spot wallet
+        - Sub-account spot wallet to main account spot wallet
+        - One sub-account spot wallet to another sub-account spot wallet
+
+        **Security Notice:** This endpoint is only available to users who created an API key after August 12, 2024.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_200_response"
+          description: Successful transfer
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_400_response"
+          description: Bad request
+        "401":
+          description: Unauthorized access - Transfer initiated by sub account user
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_404_response"
+          description: Wallet not found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_422_response"
+          description: Unprocessable entity
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Sub Account Transfer
+      tags:
+      - Wallet
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /exchange/v1/wallets/transfer:
+    post:
+      description: |
+        Transfer funds between spot and futures wallets within the master account.
+
+        Supported transfers:
+        - Transfer from spot to futures wallet
+        - Transfer from futures to spot wallet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/_exchange_v1_wallets_transfer_post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_sub_account_transfer_post_200_response"
+          description: Successful transfer
+        "400":
+          description: Insufficient funds
+        "404":
+          description: Wallet not found - Futures wallet not created for user
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/_exchange_v1_wallets_transfer_post_422_response"
+          description: Unprocessable entity
+      security:
+      - ApiKeyAuth: []
+        SignatureAuth: []
+      summary: Wallet Transfer
+      tags:
+      - Wallet
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+components:
+  schemas:
+    Error:
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+      type: object
+    _exchange_ticker_get_200_response_inner:
+      example:
+        market: SNTBTC
+        volume: 5.637376656633329
+        high: 1.4658129805029452
+        low: 5.962133916683182
+        ask: 6.027456183070403
+        bid: 0.8008281904610115
+        timestamp: 2
+      properties:
+        market:
+          example: SNTBTC
+          type: string
+        bid:
+          description: Highest bid offer in the orderbook
+          type: number
+        ask:
+          description: Lowest ask offer in the orderbook
+          type: number
+        high:
+          description: 24 hour high
+          type: number
+        low:
+          description: 24 hour low
+          type: number
+        volume:
+          description: 24 hour volume
+          type: number
+        timestamp:
+          description: Time when this ticker was generated
+          type: integer
+      type: object
+    _exchange_v1_markets_details_get_200_response_inner:
+      example:
+        symbol: symbol
+        base_currency_precision: 2
+        max_leverage: 3.616076749251911
+        max_quantity: 6.027456183070403
+        target_currency_short_name: target_currency_short_name
+        order_types:
+        - order_types
+        - order_types
+        min_notional: 5.637376656633329
+        target_currency_precision: 7
+        pair: pair
+        ecode: ecode
+        max_price: 5.962133916683182
+        base_currency_short_name: base_currency_short_name
+        min_quantity: 0.8008281904610115
+        min_price: 1.4658129805029452
+        max_leverage_short: 2.027123023002322
+        coindcx_name: coindcx_name
+        step: 9.301444243932576
+        base_currency_name: base_currency_name
+        target_currency_name: target_currency_name
+        status: status
+      properties:
+        coindcx_name:
+          type: string
+        base_currency_short_name:
+          type: string
+        target_currency_short_name:
+          type: string
+        target_currency_name:
+          type: string
+        base_currency_name:
+          type: string
+        min_quantity:
+          description: Minimum quantity of target currency for which an order may
+            be placed
+          type: number
+        max_quantity:
+          description: Maximum quantity of target currency for which an order may
+            be placed
+          type: number
+        min_price:
+          description: Minimum price per unit
+          type: number
+        max_price:
+          description: Maximum price per unit
+          type: number
+        min_notional:
+          description: Minimum notional value
+          type: number
+        base_currency_precision:
+          type: integer
+        target_currency_precision:
+          type: integer
+        step:
+          description: Price precision
+          type: number
+        order_types:
+          items:
+            type: string
+          type: array
+        symbol:
+          type: string
+        ecode:
+          description: Exchange code
+          type: string
+        max_leverage:
+          type: number
+        max_leverage_short:
+          type: number
+        pair:
+          description: "String created by (ecode, target_currency_short_name, base_currency_short_name)"
+          type: string
+        status:
+          type: string
+      type: object
+    _market_data_trade_history_get_200_response_inner:
+      example:
+        p: 0.8008281904610115
+        q: 6.027456183070403
+        T: 1
+        m: true
+      properties:
+        p:
+          description: Trade price
+          type: number
+        q:
+          description: Quantity
+          type: number
+        T:
+          description: Timestamp
+          type: integer
+        m:
+          description: Whether the buyer is market maker
+          type: boolean
+      type: object
+    _market_data_orderbook_get_200_response:
+      example:
+        asks: "{}"
+        bids: "{}"
+      properties:
+        bids:
+          description: Buy orders sorted in descending order
+          type: object
+        asks:
+          description: Sell orders sorted in ascending order
+          type: object
+      type: object
+    _market_data_candles_get_200_response_inner:
+      example:
+        volume: 2.3021358869347655
+        high: 1.4658129805029452
+        low: 5.962133916683182
+        time: 0
+        close: 5.637376656633329
+        open: 6.027456183070403
+      properties:
+        time:
+          type: integer
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+      type: object
+    _market_data_v3_orderbook__instrument__futures__depth__get_200_response:
+      example:
+        asks:
+        - - "50100.00"
+          - "0.3"
+        - - "50100.00"
+          - "0.3"
+        bids:
+        - - "50000.00"
+          - "0.5"
+        - - "50000.00"
+          - "0.5"
+      properties:
+        bids:
+          description: Buy orders
+          items:
+            description: "Price and quantity pair [price, quantity]"
+            example:
+            - "50000.00"
+            - "0.5"
+            items:
+              type: string
+            type: array
+          type: array
+        asks:
+          description: Sell orders
+          items:
+            description: "Price and quantity pair [price, quantity]"
+            example:
+            - "50100.00"
+            - "0.3"
+            items:
+              type: string
+            type: array
+          type: array
+      type: object
+    _exchange_v1_users_balances_post_request:
+      properties:
+        timestamp:
+          description: Current timestamp in milliseconds
+          format: int64
+          type: integer
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_users_balances_post_200_response_inner:
+      example:
+        locked_balance: 6.027456183070403
+        balance: 0.8008281904610115
+        currency: currency
+      properties:
+        currency:
+          type: string
+        balance:
+          type: number
+        locked_balance:
+          description: Balance currently being used by an open order
+          type: number
+      type: object
+    _exchange_v1_users_info_post_200_response:
+      example:
+        coindcx_id: coindcx_id
+      properties:
+        coindcx_id:
+          description: User ID
+          type: string
+      type: object
+    _exchange_v1_orders_create_post_request:
+      properties:
+        market:
+          description: The trading pair
+          example: SNTBTC
+          type: string
+        total_quantity:
+          description: Quantity to trade
+          example: 1.101
+          type: number
+        price_per_unit:
+          description: Price per unit (not required for market order)
+          example: 0.082
+          type: number
+        side:
+          description: Specify buy or sell
+          enum:
+          - buy
+          - sell
+          type: string
+        order_type:
+          description: Order Type
+          enum:
+          - market_order
+          - limit_order
+          type: string
+        client_order_id:
+          description: Client order id of the order
+          example: 2022.02.14-btcinr_1
+          type: string
+        timestamp:
+          description: Current timestamp in milliseconds
+          format: int64
+          type: integer
+      required:
+      - market
+      - order_type
+      - side
+      - timestamp
+      - total_quantity
+      type: object
+    _exchange_v1_orders_create_post_200_response_orders_inner:
+      example:
+        side: side
+        fee: 6.027456183070403
+        created_at: 2000-01-23T04:56:07.000+00:00
+        avg_price: 5.637376656633329
+        remaining_quantity: 5.962133916683182
+        market: market
+        fee_amount: 0.8008281904610115
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        total_quantity: 1.4658129805029452
+        id: id
+        price_per_unit: 2.3021358869347655
+        order_type: order_type
+        status: status
+      properties:
+        id:
+          type: string
+        market:
+          type: string
+        order_type:
+          type: string
+        side:
+          type: string
+        status:
+          type: string
+        fee_amount:
+          type: number
+        fee:
+          type: number
+        total_quantity:
+          type: number
+        remaining_quantity:
+          type: number
+        avg_price:
+          type: number
+        price_per_unit:
+          type: number
+        created_at:
+          format: date-time
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+      type: object
+    _exchange_v1_orders_create_post_200_response:
+      example:
+        orders:
+        - side: side
+          fee: 6.027456183070403
+          created_at: 2000-01-23T04:56:07.000+00:00
+          avg_price: 5.637376656633329
+          remaining_quantity: 5.962133916683182
+          market: market
+          fee_amount: 0.8008281904610115
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          total_quantity: 1.4658129805029452
+          id: id
+          price_per_unit: 2.3021358869347655
+          order_type: order_type
+          status: status
+        - side: side
+          fee: 6.027456183070403
+          created_at: 2000-01-23T04:56:07.000+00:00
+          avg_price: 5.637376656633329
+          remaining_quantity: 5.962133916683182
+          market: market
+          fee_amount: 0.8008281904610115
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          total_quantity: 1.4658129805029452
+          id: id
+          price_per_unit: 2.3021358869347655
+          order_type: order_type
+          status: status
+      properties:
+        orders:
+          items:
+            $ref: "#/components/schemas/_exchange_v1_orders_create_post_200_response_orders_inner"
+          type: array
+      type: object
+    _exchange_v1_orders_create_multiple_post_request_orders_inner:
+      properties:
+        market:
+          example: SNTBTC
+          type: string
+        total_quantity:
+          example: 1.101
+          type: number
+        price_per_unit:
+          example: 0.082
+          type: number
+        side:
+          enum:
+          - buy
+          - sell
+          type: string
+        order_type:
+          enum:
+          - market_order
+          - limit_order
+          type: string
+        ecode:
+          description: Exchange code
+          example: I
+          type: string
+        client_order_id:
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - ecode
+      - market
+      - order_type
+      - side
+      - timestamp
+      - total_quantity
+      type: object
+    _exchange_v1_orders_create_multiple_post_request:
+      properties:
+        orders:
+          items:
+            $ref: "#/components/schemas/_exchange_v1_orders_create_multiple_post_request_orders_inner"
+          type: array
+      required:
+      - orders
+      type: object
+    _exchange_v1_orders_create_multiple_post_200_response:
+      example:
+        orders:
+        - "{}"
+        - "{}"
+      properties:
+        orders:
+          items:
+            type: object
+          type: array
+      type: object
+    _exchange_v1_orders_status_post_request:
+      properties:
+        id:
+          description: The ID of the order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        client_order_id:
+          description: The Client Order ID of the order
+          example: 2022.02.14-btcinr_1
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_orders_status_multiple_post_request:
+      properties:
+        ids:
+          description: Array of order IDs
+          example:
+          - ead19992-43fd-11e8-b027-bb815bcb14ed
+          - 8a1d1e4c-c895-11e8-9dff-df1480546936
+          items:
+            type: string
+          type: array
+        client_order_ids:
+          description: Array of client order IDs
+          example:
+          - 2022.02.14-btcinr_1
+          - 2022.02.14-btcinr_2
+          items:
+            type: string
+          type: array
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - ids
+      - timestamp
+      type: object
+    _exchange_v1_orders_active_orders_post_request:
+      properties:
+        market:
+          example: SNTBTC
+          type: string
+        side:
+          enum:
+          - buy
+          - sell
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - market
+      - timestamp
+      type: object
+    _exchange_v1_orders_trade_history_post_request:
+      properties:
+        limit:
+          default: 500
+          description: Number of trades to return
+          maximum: 5000
+          minimum: 1
+          type: integer
+        from_id:
+          description: Trade ID after which you want the data
+          example: 28473
+          type: integer
+        sort:
+          default: asc
+          description: Sort order
+          enum:
+          - asc
+          - desc
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_orders_active_orders_count_post_200_response:
+      example:
+        count: 0
+        status: 6
+      properties:
+        count:
+          type: integer
+        status:
+          type: integer
+      type: object
+    _exchange_v1_orders_cancel_all_post_request:
+      properties:
+        market:
+          example: SNTBTC
+          type: string
+        side:
+          description: Optional - specify to cancel only buy or sell orders
+          enum:
+          - buy
+          - sell
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - market
+      - timestamp
+      type: object
+    _exchange_v1_orders_cancel_by_ids_post_request:
+      properties:
+        ids:
+          description: Array of order IDs
+          example:
+          - 8a2f4284-c895-11e8-9e00-5b2c002a6ff4
+          - 8a1d1e4c-c895-11e8-9dff-df1480546936
+          items:
+            type: string
+          type: array
+      required:
+      - ids
+      type: object
+    _exchange_v1_orders_cancel_post_request:
+      properties:
+        id:
+          description: The ID of the order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_orders_edit_post_request:
+      properties:
+        id:
+          description: The ID of the order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        price_per_unit:
+          description: New price for the order
+          example: 123.45
+          type: number
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - id
+      - price_per_unit
+      - timestamp
+      type: object
+    _exchange_v1_funding_fetch_orders_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_funding_fetch_orders_post_200_response_inner:
+      example:
+        currency_short_name: currency_short_name
+        id: id
+      properties:
+        id:
+          type: string
+        currency_short_name:
+          type: string
+      type: object
+    _exchange_v1_funding_lend_post_request:
+      properties:
+        currency_short_name:
+          description: Currency to lend
+          example: BTC
+          type: string
+        timestamp:
+          format: int64
+          type: integer
+      required:
+      - currency_short_name
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_orders_post_request:
+      properties:
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          format: int64
+          type: integer
+        page:
+          description: Page number
+          example: "1"
+          type: string
+        size:
+          description: Number of records per page
+          example: "10"
+          type: string
+        pairs:
+          description: Comma-separated list of pairs (optional)
+          example: "B-BTC_USDT,B-ETH_USDT"
+          type: string
+        order_ids:
+          description: Comma-separated list of order IDs (optional)
+          type: string
+        margin_currency_short_name:
+          default:
+          - USDT
+          description: Futures margin mode
+          items:
+            enum:
+            - INR
+            - USDT
+            type: string
+          type: array
+      required:
+      - page
+      - size
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_orders_create_post_request:
+      properties:
+        timestamp:
+          description: EPOCH timestamp in milliseconds. Orders with delay > 10 seconds
+            will be rejected
+          format: int64
+          type: integer
+        side:
+          description: Order side
+          enum:
+          - buy
+          - sell
+          type: string
+        pair:
+          description: Pair name (format B-ETH_USDT)
+          example: B-ETH_USDT
+          type: string
+        order_type:
+          description: Order type
+          enum:
+          - market
+          - limit
+          - stop_limit
+          - stop_market
+          - take_profit_limit
+          - take_profit_market
+          type: string
+        price:
+          description: "Order Price (limit price for limit, stop limit, and take profit\
+            \ limit orders). NULL for market orders"
+          type: number
+        stop_price:
+          description: "Stop Price (for stop_limit, stop_market, take_profit_limit,\
+            \ take_profit_market orders). Trigger price"
+          type: number
+        total_quantity:
+          description: Order total quantity
+          type: number
+        leverage:
+          description: Leverage at which to take position. Should match position leverage
+          type: number
+        notification:
+          description: Email notification preference
+          enum:
+          - no_notification
+          - email_notification
+          type: string
+        time_in_force:
+          default: good_till_cancel
+          description: Time in force (null for market orders)
+          enum:
+          - good_till_cancel
+          - fill_or_kill
+          - immediate_or_cancel
+          type: string
+        hidden:
+          description: Not supported at the moment
+          type: boolean
+        post_only:
+          description: Not supported at the moment
+          type: boolean
+        margin_currency_short_name:
+          default: USDT
+          description: Futures margin mode
+          enum:
+          - INR
+          - USDT
+          type: string
+        position_margin_type:
+          description: Position margin type
+          enum:
+          - isolated
+          - crossed
+          type: string
+        take_profit_price:
+          description: "Take profit trigger price (only for market_order, limit_order)"
+          type: number
+        stop_loss_price:
+          description: "Stop loss trigger price (only for market_order, limit_order)"
+          type: number
+      required:
+      - notification
+      - order_type
+      - pair
+      - side
+      - timestamp
+      - total_quantity
+      type: object
+    _exchange_v1_derivatives_futures_orders_cancel_post_request:
+      properties:
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          format: int64
+          type: integer
+        id:
+          description: Order ID
+          type: string
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_orders_cancel_post_200_response:
+      example:
+        code: 6
+        message: message
+        status: 0
+      properties:
+        message:
+          type: string
+        status:
+          type: integer
+        code:
+          type: integer
+      type: object
+    _exchange_v1_derivatives_futures_positions_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        page:
+          example: "1"
+          type: string
+        size:
+          example: "10"
+          type: string
+        pairs:
+          description: Comma-separated list of pairs (optional)
+          type: string
+        position_ids:
+          description: Comma-separated list of position IDs (optional)
+          type: string
+        margin_currency_short_name:
+          default:
+          - USDT
+          items:
+            enum:
+            - INR
+            - USDT
+            type: string
+          type: array
+      required:
+      - page
+      - size
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_update_leverage_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        leverage:
+          description: Leverage value
+          example: "5"
+          type: string
+        pair:
+          description: Instrument pair (use either pair or id)
+          type: string
+        id:
+          description: Position ID (use either pair or id)
+          type: string
+        margin_currency_short_name:
+          default: USDT
+          enum:
+          - INR
+          - USDT
+          type: string
+      required:
+      - leverage
+      - margin_currency_short_name
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_add_margin_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        id:
+          description: Position ID
+          type: string
+        amount:
+          description: "Amount to add (in INR for INR margin, USDT for USDT margin)"
+          type: number
+      required:
+      - amount
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_remove_margin_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        id:
+          description: Position ID
+          type: string
+        amount:
+          description: "Amount to remove (in INR for INR margin, USDT for USDT margin)"
+          type: number
+      required:
+      - amount
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_cancel_all_open_orders_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        margin_currency_short_name:
+          default:
+          - USDT
+          items:
+            enum:
+            - INR
+            - USDT
+            type: string
+          type: array
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_cancel_all_open_orders_for_position_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        id:
+          description: Position ID
+          type: string
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_exit_post_200_response_data:
+      example:
+        group_id: group_id
+      properties:
+        group_id:
+          type: string
+      type: object
+    _exchange_v1_derivatives_futures_positions_exit_post_200_response:
+      example:
+        code: 6
+        data:
+          group_id: group_id
+        message: message
+        status: 0
+      properties:
+        message:
+          type: string
+        status:
+          type: integer
+        code:
+          type: integer
+        data:
+          $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_exit_post_200_response_data"
+      type: object
+    _exchange_v1_derivatives_futures_positions_create_tpsl_post_request_take_profit:
+      properties:
+        stop_price:
+          description: Stop price (trigger price)
+          type: string
+        limit_price:
+          description: Limit price (not currently supported)
+          type: string
+        order_type:
+          description: Only take_profit_market is currently supported
+          enum:
+          - take_profit_market
+          type: string
+      required:
+      - order_type
+      - stop_price
+      type: object
+    _exchange_v1_derivatives_futures_positions_create_tpsl_post_request_stop_loss:
+      properties:
+        stop_price:
+          description: Stop price (trigger price)
+          type: string
+        limit_price:
+          description: Limit price (not currently supported)
+          type: string
+        order_type:
+          description: Only stop_market is currently supported
+          enum:
+          - stop_market
+          type: string
+      required:
+      - order_type
+      - stop_price
+      type: object
+    _exchange_v1_derivatives_futures_positions_create_tpsl_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        id:
+          description: Position ID
+          type: string
+        take_profit:
+          $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_create_tpsl_post_request_take_profit"
+        stop_loss:
+          $ref: "#/components/schemas/_exchange_v1_derivatives_futures_positions_create_tpsl_post_request_stop_loss"
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_positions_transactions_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        stage:
+          description: Transaction stage filter
+          enum:
+          - all
+          - default
+          - funding
+          - exit
+          - tpsl_exit
+          - liquidation
+          type: string
+        page:
+          example: "1"
+          type: string
+        size:
+          example: "10"
+          type: string
+        margin_currency_short_name:
+          default:
+          - USDT
+          items:
+            enum:
+            - INR
+            - USDT
+            type: string
+          type: array
+      required:
+      - page
+      - size
+      - stage
+      - timestamp
+      type: object
+    _exchange_v1_derivatives_futures_trades_post_request:
+      properties:
+        timestamp:
+          format: int64
+          type: integer
+        pair:
+          description: Instrument pair (optional)
+          example: B-BTC_USDT
+          type: string
+        order_id:
+          description: Order ID (optional)
+          type: string
+        from_date:
+          description: Start date (YYYY-MM-DD)
+          example: 2024-01-01
+          format: date
+          type: string
+        to_date:
+          description: End date (YYYY-MM-DD)
+          example: 2024-01-31
+          format: date
+          type: string
+        page:
+          example: "1"
+          type: string
+        size:
+          example: "10"
+          type: string
+        margin_currency_short_name:
+          default:
+          - USDT
+          items:
+            enum:
+            - INR
+            - USDT
+            type: string
+          type: array
+      required:
+      - page
+      - size
+      - timestamp
+      type: object
+    _exchange_v1_margin_create_post_request:
+      properties:
+        market:
+          description: The trading pair
+          example: XRPBTC
+          type: string
+        quantity:
+          description: Quantity to trade
+          example: 90
+          type: number
+        price:
+          description: "Price per unit (not required for market order, mandatory for\
+            \ rest)"
+          example: 0.000025
+          type: number
+        leverage:
+          default: 1.0
+          description: Borrowed capital to increase the potential returns
+          example: 1.0
+          type: number
+        side:
+          description: Specify buy or sell
+          enum:
+          - buy
+          - sell
+          example: buy
+          type: string
+        stop_price:
+          description: Price to stop the order at (mandatory in case of stop_limit
+            & take_profit)
+          example: 0.082
+          type: number
+        order_type:
+          description: Order Type
+          enum:
+          - market_order
+          - limit_order
+          - stop_limit
+          - take_profit
+          example: limit_order
+          type: string
+        trailing_sl:
+          description: To place order with Trailing Stop Loss
+          example: false
+          type: boolean
+        target_price:
+          description: The price to buy/sell or close the order position
+          example: 0.082
+          type: number
+        sl_price:
+          description: Stop loss price
+          example: 0.00005005
+          type: number
+        ecode:
+          default: B
+          description: Exchange code in which the order will be placed (always 'B')
+          example: B
+          type: string
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - ecode
+      - market
+      - order_type
+      - quantity
+      - side
+      - timestamp
+      type: object
+    _exchange_v1_margin_create_post_200_response_inner:
+      example:
+        market: XRPBTC
+        leverage: 1
+        side: sell
+        initial_margin: 0.00520208
+        quantity: 200
+        price: 0.000026
+        trailing_sl: false
+        id: 30b5002f-d9c1-413d-8a8d-0fd32b054c9c
+        order_type: limit_order
+        status: init
+      properties:
+        id:
+          example: 30b5002f-d9c1-413d-8a8d-0fd32b054c9c
+          type: string
+        side:
+          example: sell
+          type: string
+        status:
+          example: init
+          type: string
+        market:
+          example: XRPBTC
+          type: string
+        order_type:
+          example: limit_order
+          type: string
+        trailing_sl:
+          example: false
+          type: boolean
+        quantity:
+          example: 200
+          type: number
+        price:
+          example: 0.000026
+          type: number
+        leverage:
+          example: 1
+          type: number
+        initial_margin:
+          example: 0.00520208
+          type: number
+      type: object
+    _exchange_v1_margin_cancel_post_request:
+      properties:
+        id:
+          description: ID of the margin order to cancel
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_margin_exit_post_request:
+      properties:
+        id:
+          description: ID of the margin order to exit
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_margin_edit_target_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        target_price:
+          description: New target price
+          example: 0.082
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - target_price
+      - timestamp
+      type: object
+    _exchange_v1_margin_edit_price_of_target_order_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        target_price:
+          description: New target order price
+          example: 0.082
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - target_price
+      - timestamp
+      type: object
+    _exchange_v1_margin_edit_sl_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        sl_price:
+          description: New stop loss price
+          example: 0.00005005
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - sl_price
+      - timestamp
+      type: object
+    _exchange_v1_margin_edit_trailing_sl_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        trailing_sl:
+          description: Enable or disable trailing stop loss
+          example: true
+          type: boolean
+        trail_percent:
+          description: Trailing percentage
+          example: 5.0
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - timestamp
+      - trailing_sl
+      type: object
+    _exchange_v1_margin_add_margin_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        amount:
+          description: Amount to add in the margin to decrease effective leverage
+          example: 0.06
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - amount
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_margin_add_margin_post_200_response:
+      example:
+        code: 200
+        message: Margin added successfully
+        status: 200
+      properties:
+        message:
+          example: Margin added successfully
+          type: string
+        status:
+          example: 200
+          type: integer
+        code:
+          example: 200
+          type: integer
+      type: object
+    _exchange_v1_margin_remove_margin_post_request:
+      properties:
+        id:
+          description: ID of the margin order
+          example: ead19992-43fd-11e8-b027-bb815bcb14ed
+          type: string
+        amount:
+          description: Amount to remove from the margin to increase effective leverage
+          example: 0.06
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - amount
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_margin_remove_margin_post_200_response:
+      example:
+        code: 200
+        message: Margin removed successfully
+        status: 200
+      properties:
+        message:
+          example: Margin removed successfully
+          type: string
+        status:
+          example: 200
+          type: integer
+        code:
+          example: 200
+          type: integer
+      type: object
+    _exchange_v1_margin_fetch_orders_post_request:
+      properties:
+        market:
+          description: The trading pair (default - orders for all markets)
+          example: XRPBTC
+          type: string
+        details:
+          default: false
+          description: Whether you want detailed information or not
+          example: false
+          type: boolean
+        status:
+          description: The status of the order (default - all orders)
+          enum:
+          - init
+          - open
+          - close
+          - rejected
+          - cancelled
+          - partial_entry
+          - partial_close
+          - triggered
+          example: open
+          type: string
+        size:
+          default: 10
+          description: Number of records per page
+          example: 20
+          type: number
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - timestamp
+      type: object
+    _exchange_v1_margin_fetch_orders_post_200_response_inner:
+      example:
+        market: XRPBTC
+        leverage: 1
+        side: sell
+        initial_margin: 0
+        quantity: 200
+        updated_at: 1568122930404
+        price: 0.000026
+        created_at: 1568122929782
+        id: 30b5002f-d9c1-413d-8a8d-0fd32b054c9c
+        order_type: limit_order
+        status: rejected
+        pnl: 0
+      properties:
+        id:
+          example: 30b5002f-d9c1-413d-8a8d-0fd32b054c9c
+          type: string
+        side:
+          example: sell
+          type: string
+        status:
+          example: rejected
+          type: string
+        market:
+          example: XRPBTC
+          type: string
+        order_type:
+          example: limit_order
+          type: string
+        quantity:
+          example: 200
+          type: number
+        price:
+          example: 0.000026
+          type: number
+        leverage:
+          example: 1
+          type: number
+        pnl:
+          example: 0
+          type: number
+        initial_margin:
+          example: 0
+          type: number
+        created_at:
+          example: 1568122929782
+          type: integer
+        updated_at:
+          example: 1568122930404
+          type: integer
+      type: object
+    _exchange_v1_margin_order_post_request:
+      properties:
+        id:
+          description: ID of the order
+          example: 30b5002f-d9c1-413d-8a8d-0fd32b054c9c
+          type: string
+        details:
+          default: false
+          description: Whether you want detailed information or not
+          example: false
+          type: boolean
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1524211224000
+          type: integer
+      required:
+      - id
+      - timestamp
+      type: object
+    _exchange_v1_wallets_sub_account_transfer_post_request:
+      properties:
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1629878400000
+          type: integer
+        from_account_id:
+          description: The account from which assets are being transferred (main or
+            sub-account ID)
+          example: xxxxx
+          type: string
+        to_account_id:
+          description: The account to which assets are being transferred (main or
+            sub-account ID)
+          example: yyyyy
+          type: string
+        currency_short_name:
+          description: "The type of asset being transferred (e.g., BTC, ETH, USDT)"
+          example: USDT
+          type: string
+        amount:
+          description: The amount of the asset to transfer
+          example: 1.5
+          format: float
+          type: number
+      required:
+      - amount
+      - currency_short_name
+      - from_account_id
+      - timestamp
+      - to_account_id
+      type: object
+    _exchange_v1_wallets_sub_account_transfer_post_200_response:
+      example:
+        code: 200
+        message: 200
+        status: success
+      properties:
+        status:
+          example: success
+          type: string
+        message:
+          example: 200
+          type: integer
+        code:
+          example: 200
+          type: integer
+      type: object
+    _exchange_v1_wallets_sub_account_transfer_post_400_response:
+      example:
+        message: Currency short name not present
+      properties:
+        message:
+          enum:
+          - Currency short name not present
+          - Insufficient funds
+          type: string
+      type: object
+    _exchange_v1_wallets_sub_account_transfer_post_404_response:
+      example:
+        message: source wallet not found
+      properties:
+        message:
+          enum:
+          - source wallet not found
+          - destination wallet not found
+          type: string
+      type: object
+    _exchange_v1_wallets_sub_account_transfer_post_422_response:
+      example:
+        message: Invalid transfer
+      properties:
+        message:
+          enum:
+          - Invalid transfer
+          - Unverified Sub-Account
+          - Amount should be greater than
+          - Your withdrawals are blocked for another XX hours because you changed
+            your account authentication mode
+          type: string
+      type: object
+    _exchange_v1_wallets_transfer_post_request:
+      properties:
+        timestamp:
+          description: EPOCH timestamp in milliseconds
+          example: 1629878400000
+          type: integer
+        source_wallet_type:
+          description: The wallet type from which balance has to be transferred
+          enum:
+          - spot
+          - futures
+          example: spot
+          type: string
+        destination_wallet_type:
+          description: The wallet type to which balance has to be transferred
+          enum:
+          - spot
+          - futures
+          example: futures
+          type: string
+        currency_short_name:
+          description: "The type of asset being transferred (e.g., BTC, ETH, USDT)"
+          example: USDT
+          type: string
+        amount:
+          description: The amount of the asset to transfer
+          example: 1.5
+          format: float
+          type: number
+      required:
+      - amount
+      - currency_short_name
+      - destination_wallet_type
+      - source_wallet_type
+      - timestamp
+      type: object
+    _exchange_v1_wallets_transfer_post_422_response:
+      example:
+        message: Invalid amount
+      properties:
+        message:
+          enum:
+          - Invalid amount
+          - Invalid currency
+          - "Derivatives Futures Wallet creation is not allowed for currency_short_name:\
+            \ <currency_short_name>"
+          - This feature is not enabled yet.
+          type: string
+      type: object
+  securitySchemes:
+    ApiKeyAuth:
+      description: API key for authentication
+      in: header
+      name: X-AUTH-APIKEY
+      type: apiKey
+    SignatureAuth:
+      description: HMAC-SHA256 signature of the request payload
+      in: header
+      name: X-AUTH-SIGNATURE
+      type: apiKey
+

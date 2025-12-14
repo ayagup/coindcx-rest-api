@@ -1,0 +1,6 @@
+{
+  "invokerPackage": "com.example.apiclient",
+  "apiPackage": "com.example.apiclient.api",
+  "modelPackage": "com.example.apiclient.model",
+  "dateLibrary": "java17" 
+}
