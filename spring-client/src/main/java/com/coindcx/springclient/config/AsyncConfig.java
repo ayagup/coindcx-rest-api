@@ -20,14 +20,17 @@ import java.util.concurrent.Executor;
  * - Core Pool Size: 5 threads (always active)
  * - Max Pool Size: 10 threads (scales up under load)
  * - Queue Capacity: 100 tasks (buffers work when all threads are busy)
+ * - Rejection Policy: CallerRunsPolicy (caller thread executes task if queue is full)
  * 
  * Expected Load:
  * - WebSocket events: ~10-20/second during normal market hours
  * - Each persistence task: ~10-50ms (database write)
  * - Current config handles ~200 tasks/second with buffering
  * 
- * If rejection occurs (queue full + max threads busy), tasks will be rejected.
- * Monitor logs for "Async method execution failed" to detect capacity issues.
+ * Backpressure Handling:
+ * If queue is full + all threads busy, the caller thread will execute the task.
+ * This provides natural backpressure instead of rejecting tasks.
+ * Monitor logs for "Async method execution failed" to detect execution issues.
  * Increase maxPoolSize and queueCapacity if sustained high throughput is needed.
  */
 @Configuration

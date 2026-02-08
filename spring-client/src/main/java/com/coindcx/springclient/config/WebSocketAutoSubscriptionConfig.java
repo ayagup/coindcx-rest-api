@@ -31,18 +31,19 @@ public class WebSocketAutoSubscriptionConfig {
     }
 
     /**
-     * Auto-subscription to SPOT and FUTURES market channels after application is ready
+     * Auto-subscription to FUTURES market channels after application is ready
      *
-     * SPOT Market Channels:
-     * - BTC/USDT Candlestick (1m interval)
-     * - BTC/USDT Orderbook Depth (20 levels)
-     * - Spot Current Prices (10s updates)
-     * - BTC/USDT New Trades
-     *
-     * FUTURES Market Channels:
+     * Currently Active - FUTURES Market Channels:
      * - BTC/USDT Candlestick (1m interval)
      * - BTC/USDT Orderbook Depth (20 levels)
      * - Futures Current Prices (real-time)
+     * - BTC/USDT New Trades
+     *
+     * SPOT Market Channels (Currently Disabled):
+     * To enable SPOT channels, uncomment lines 64-96 in this file.
+     * - BTC/USDT Candlestick (1m interval)
+     * - BTC/USDT Orderbook Depth (20 levels)
+     * - Spot Current Prices (10s updates)
      * - BTC/USDT New Trades
      *
      * All channels persist data to database automatically.
@@ -54,7 +55,7 @@ public class WebSocketAutoSubscriptionConfig {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void autoSubscribeToChannels() {
-        logger.info("🚀 Starting auto-subscription to SPOT and FUTURES market WebSocket channels...");
+        logger.info("🚀 Starting auto-subscription to FUTURES market WebSocket channels...");
 
         try {
             // Wait for application to fully initialize
