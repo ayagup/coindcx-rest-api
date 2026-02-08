@@ -10,11 +10,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * Auto-subscription configuration for WebSocket channels
- * ENABLED - Automatically subscribes to SPOT and FUTURES market channels on startup
+ * ENABLED - Automatically subscribes to FUTURES market channels on startup
  *
- * Total 8 channels:
- * - 4 SPOT channels (candlestick, orderbook, prices, trades)
+ * Currently configured:
  * - 4 FUTURES channels (candlestick, orderbook, prices, trades)
+ * 
+ * Note: SPOT channels are commented out (lines 61-96).
+ * Uncomment SPOT subscriptions if public channel data is also needed.
  */
 @Component
 public class WebSocketAutoSubscriptionConfig {
@@ -134,8 +136,9 @@ public class WebSocketAutoSubscriptionConfig {
             logger.info("  ✓ Subscribed to futures new trade (B-BTC_USDT@trades-futures)");
 
             logger.info("✅ FUTURES market: 4 channels subscribed");
-            logger.info("🎉 Auto-subscription completed - SPOT + FUTURES markets active with 8 total channels");
+            logger.info("🎉 Auto-subscription completed - FUTURES markets active with 4 total channels");
             logger.info("📊 All data is being persisted to MySQL database automatically");
+            logger.info("💡 To enable SPOT channels, uncomment lines 61-96 in WebSocketAutoSubscriptionConfig.java");
 
         } catch (InterruptedException e) {
             logger.error("❌ Auto-subscription interrupted", e);

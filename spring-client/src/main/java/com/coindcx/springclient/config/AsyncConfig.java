@@ -15,6 +15,20 @@ import java.util.concurrent.Executor;
 /**
  * Configuration for async method execution
  * Provides custom exception handler to catch and log exceptions in @Async methods
+ * 
+ * Thread Pool Configuration:
+ * - Core Pool Size: 5 threads (always active)
+ * - Max Pool Size: 10 threads (scales up under load)
+ * - Queue Capacity: 100 tasks (buffers work when all threads are busy)
+ * 
+ * Expected Load:
+ * - WebSocket events: ~10-20/second during normal market hours
+ * - Each persistence task: ~10-50ms (database write)
+ * - Current config handles ~200 tasks/second with buffering
+ * 
+ * If rejection occurs (queue full + max threads busy), tasks will be rejected.
+ * Monitor logs for "Async method execution failed" to detect capacity issues.
+ * Increase maxPoolSize and queueCapacity if sustained high throughput is needed.
  */
 @Configuration
 @EnableAsync
@@ -29,6 +43,9 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(10);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("async-websocket-");
+        // Use CallerRunsPolicy: if queue is full, caller thread executes the task
+        // This provides backpressure instead of rejecting tasks
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }
