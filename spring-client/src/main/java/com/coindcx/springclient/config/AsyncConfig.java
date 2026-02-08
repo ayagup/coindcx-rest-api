@@ -11,6 +11,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Configuration for async method execution
@@ -48,7 +49,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setThreadNamePrefix("async-websocket-");
         // Use CallerRunsPolicy: if queue is full, caller thread executes the task
         // This provides backpressure instead of rejecting tasks
-        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }

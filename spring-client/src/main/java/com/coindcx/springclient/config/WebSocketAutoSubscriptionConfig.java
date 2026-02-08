@@ -40,7 +40,7 @@ public class WebSocketAutoSubscriptionConfig {
      * - BTC/USDT New Trades
      *
      * SPOT Market Channels (Currently Disabled):
-     * To enable SPOT channels, uncomment lines 64-96 in this file.
+     * To enable SPOT channels, uncomment lines 64-102 in this file.
      * - BTC/USDT Candlestick (1m interval)
      * - BTC/USDT Orderbook Depth (20 levels)
      * - Spot Current Prices (10s updates)
@@ -58,7 +58,8 @@ public class WebSocketAutoSubscriptionConfig {
         logger.info("🚀 Starting auto-subscription to FUTURES market WebSocket channels...");
 
         try {
-            // Wait for application to fully initialize
+            // Wait briefly for WebSocket service to initialize
+            // Note: This runs in a separate thread (ApplicationReadyEvent), not blocking main startup
             Thread.sleep(1000);
 
             // // ==================== SPOT MARKET CHANNELS ====================
@@ -139,7 +140,7 @@ public class WebSocketAutoSubscriptionConfig {
             logger.info("✅ FUTURES market: 4 channels subscribed");
             logger.info("🎉 Auto-subscription completed - FUTURES markets active with 4 total channels");
             logger.info("📊 All data is being persisted to MySQL database automatically");
-            logger.info("💡 To enable SPOT channels, uncomment lines 61-96 in WebSocketAutoSubscriptionConfig.java");
+            logger.info("💡 To enable SPOT channels, uncomment lines 64-102 in WebSocketAutoSubscriptionConfig.java");
 
         } catch (InterruptedException e) {
             logger.error("❌ Auto-subscription interrupted", e);
