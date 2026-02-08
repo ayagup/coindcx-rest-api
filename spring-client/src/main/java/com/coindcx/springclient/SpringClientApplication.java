@@ -8,11 +8,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Main Spring Boot Application
  * 
- * @EnableAsync - Enables asynchronous method execution for WebSocket data persistence
  * @EnableScheduling - Enables scheduled tasks for data cleanup
+ * Note: @EnableAsync is configured in AsyncConfig.java with custom exception handler
  */
 @SpringBootApplication
-@EnableAsync
 @EnableScheduling
 public class SpringClientApplication {
 
