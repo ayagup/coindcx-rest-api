@@ -311,7 +311,7 @@
             <version>2.3.0</version>
         </dependency>
 
-        <!-- Socket.IO Client -->
+        <!-- Socket.IO Client Java -->
         <dependency>
             <groupId>io.socket</groupId>
             <artifactId>socket.io-client</artifactId>

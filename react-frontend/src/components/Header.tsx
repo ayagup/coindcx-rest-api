@@ -10,7 +10,8 @@ import {
   User, 
   Activity,
   LogOut,
-  Key
+  Key,
+  Wifi
 } from 'lucide-react';
 
 const Header: React.FC = () => {
@@ -63,6 +64,11 @@ const Header: React.FC = () => {
               </Link>
             </>
           )}
+          
+          <Link to="/websocket" className={isActive('/websocket') ? 'nav-link active' : 'nav-link'}>
+            <Wifi size={18} />
+            <span>WebSocket</span>
+          </Link>
           
           <Link to="/api-logs" className={isActive('/api-logs') ? 'nav-link active' : 'nav-link'}>
             <Activity size={18} />

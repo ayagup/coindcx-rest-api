@@ -134,7 +134,7 @@ public class ApiClient {
         
         // 2. Set the desired logging level
         // Options: NONE, BASIC, HEADERS, BODY
-        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BASIC);
 
         initHttpClient(Collections.singletonList(loggingInterceptor));
     }

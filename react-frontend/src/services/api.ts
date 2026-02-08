@@ -126,6 +126,29 @@ export const apiService = {
   getApiCallsInTimeRange: (start: string, end: string) => apiClient.get('/api/logs/time-range', { params: { start, end } }),
   getSlowApiCalls: (threshold: number) => apiClient.get(`/api/logs/slow/${threshold}`),
   getFailedApiCalls: () => apiClient.get('/api/logs/failed'),
+
+  // WebSocket Monitoring APIs (No authentication required)
+  getWebSocketStatus: () => apiClient.get('/api/websocket/status'),
+  getWebSocketMessages: (event: string) => apiClient.get('/api/websocket/messages', { params: { event } }),
+  clearWebSocketMessages: (event: string) => apiClient.delete('/api/websocket/messages/clear', { params: { event } }),
+  clearAllWebSocketMessages: () => apiClient.delete('/api/websocket/messages/clear-all'),
+
+  // WebSocket Data Query APIs (No authentication required)
+  getWebSocketDataStats: () => apiClient.get('/api/websocket/data/stats'),
+  getSpotMarketData: (marketPair: string, limit?: number) => 
+    apiClient.get(`/api/websocket/data/spot/${marketPair}`, { params: { limit } }),
+  getFuturesMarketData: (contractSymbol: string, limit?: number) => 
+    apiClient.get(`/api/websocket/data/futures/${contractSymbol}`, { params: { limit } }),
+  getLatestSpotPrice: (marketPair: string) => 
+    apiClient.get(`/api/websocket/data/spot/${marketPair}/latest-price`),
+  getLatestFuturesPrice: (contractSymbol: string) => 
+    apiClient.get(`/api/websocket/data/futures/${contractSymbol}/latest-price`),
+  getSpotMarketDataRange: (marketPair: string, since: string) => 
+    apiClient.get(`/api/websocket/data/spot/${marketPair}/range`, { params: { since } }),
+  getFuturesMarketDataRange: (contractSymbol: string, since: string) => 
+    apiClient.get(`/api/websocket/data/futures/${contractSymbol}/range`, { params: { since } }),
+  getAllSpotMarkets: () => apiClient.get('/api/websocket/data/spot/markets'),
+  getAllFuturesContracts: () => apiClient.get('/api/websocket/data/futures/contracts'),
 };
 
 export default apiClient;

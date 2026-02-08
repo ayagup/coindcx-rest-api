@@ -7,6 +7,10 @@ public class WebSocketChannels {
     
     // Private Channels (require authentication)
     public static final String CHANNEL_PRIVATE_COINDCX = "coindcx";
+    public static final String CHANNEL_PRIVATE_FUTURES_BTC_PRICE_1M = "B-BTC_USDT_1m-futures";
+    public static final String CHANNEL_PRIVATE_FUTURES_BTC_NEW_TRADES = "B-BTC_USDT@trades-futures";
+    public static final String CHANNEL_PRIVATE_FUTURES_BTC_DEPTH_UPDATE = "B-BTC_USDT@orderbook@20-futures";
+    public static final String CHANNEL_PRIVATE_FUTURES_CURRENT_PRICES = "currentPrices@futures@rt";
     
     // Public Channel Patterns
     public static final String CHANNEL_CANDLESTICK_PATTERN = "%s_%s"; // pair_interval (e.g., B-BTC_USDT_1m)
@@ -20,6 +24,9 @@ public class WebSocketChannels {
     public static final String EVENT_BALANCE_UPDATE = "balance-update";
     public static final String EVENT_ORDER_UPDATE = "order-update";
     public static final String EVENT_TRADE_UPDATE = "trade-update";
+    public static final String EVENT_FUTURES_POSITION_UPDATE = "df-position-update";
+    public static final String EVENT_FUTURES_ORDER_UPDATE = "df-order-update";
+    public static final String EVENT_FUTURES_BALANCE_UPDATE = "balance-update";
     
     // Events - Public
     public static final String EVENT_CANDLESTICK = "candlestick";
@@ -29,6 +36,7 @@ public class WebSocketChannels {
     public static final String EVENT_PRICE_CHANGE = "price-change";
     public static final String EVENT_CURRENT_PRICES_UPDATE = "currentPrices@spot#update";
     public static final String EVENT_PRICE_STATS_UPDATE = "priceStats@spot#update";
+    public static final String EVENT_FUTURES_CURRENT_PRICES_UPDATE = "currentPrices@futures#update";
     
     // Socket Events
     public static final String EVENT_CONNECT = "connect";

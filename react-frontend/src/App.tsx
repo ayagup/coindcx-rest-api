@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import MarketPage from './pages/MarketPage';
 import LoginPage from './pages/LoginPage';
+import WebSocketPage from './pages/WebSocketPage';
 import './App.css';
 
 // Protected Route Component
@@ -60,6 +61,7 @@ const AppRoutes: React.FC = () => {
               </ProtectedRoute>
             }
           />
+          <Route path="/websocket" element={<WebSocketPage />} />
           <Route path="/api-logs" element={<div className="page"><h1>API Logs - Coming Soon</h1></div>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

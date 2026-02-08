@@ -113,28 +113,28 @@ public class ApiCallLoggingAspect {
             log.setExecutionTimeMs(endTime - startTime);
             
             // Enhanced console logging
-            logger.info("═══════════════════════════════════════════════════════════════");
-            logger.info("API CALL LOGGED");
-            logger.info("Service: {}.{}", serviceName, methodName);
-            logger.info("Status: {}", log.getStatus());
-            logger.info("Duration: {}ms", log.getExecutionTimeMs());
-            logger.info("Timestamp: {}", log.getTimestamp());
+            logger.debug("═══════════════════════════════════════════════════════════════");
+            logger.debug("API CALL LOGGED");
+            logger.debug("Service: {}.{}", serviceName, methodName);
+            logger.debug("Status: {}", log.getStatus());
+            logger.debug("Duration: {}ms", log.getExecutionTimeMs());
+            logger.debug("Timestamp: {}", log.getTimestamp());
             if (log.getHttpStatusCode() != null) {
-                logger.info("HTTP Status: {}", log.getHttpStatusCode());
+                logger.debug("HTTP Status: {}", log.getHttpStatusCode());
             }
             if (log.getRequestParams() != null && !log.getRequestParams().isEmpty()) {
-                logger.info("Request Params: {}", log.getRequestParams());
+                logger.debug("Request Params: {}", log.getRequestParams());
             }
             if ("FAILURE".equals(log.getStatus()) && log.getErrorMessage() != null) {
                 logger.error("Error: {}", log.getErrorMessage());
             }
             if (log.getResponseData() != null && !log.getResponseData().isEmpty()) {
-                logger.info("Response Preview: {}", 
+                logger.debug("Response Preview: {}",
                     log.getResponseData().length() > 200 
                         ? log.getResponseData().substring(0, 200) + "..." 
                         : log.getResponseData());
             }
-            logger.info("═══════════════════════════════════════════════════════════════");
+            logger.debug("═══════════════════════════════════════════════════════════════");
             
             // Save log to database
             try {
