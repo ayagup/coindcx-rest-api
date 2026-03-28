@@ -5,6 +5,7 @@ import Header from './components/Header';
 import MarketPage from './pages/MarketPage';
 import LoginPage from './pages/LoginPage';
 import WebSocketPage from './pages/WebSocketPage';
+import ChartPage from './pages/ChartPage';
 import './App.css';
 
 // Protected Route Component
@@ -63,6 +64,7 @@ const AppRoutes: React.FC = () => {
           />
           <Route path="/websocket" element={<WebSocketPage />} />
           <Route path="/api-logs" element={<div className="page"><h1>API Logs - Coming Soon</h1></div>} />
+          <Route path="/chart/:marketType/:symbol" element={<ChartPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

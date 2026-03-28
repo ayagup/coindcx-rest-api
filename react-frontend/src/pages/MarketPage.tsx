@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 
 type MarketType = 'spot' | 'futures';
+
+const FUTURES_SYMBOLS = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT'];
 
 interface MarketData {
   market: string;
@@ -18,8 +21,9 @@ interface MarketData {
 }
 
 const MarketPage: React.FC = () => {
+  const navigate = useNavigate();
   const [spotMarkets, setSpotMarkets] = useState<string[]>([]);
-  const [futuresMarkets, setFuturesMarkets] = useState<string[]>([]);
+  const [futuresMarkets] = useState<string[]>(FUTURES_SYMBOLS);
   const [spotData, setSpotData] = useState<Map<string, MarketData>>(new Map());
   const [futuresData, setFuturesData] = useState<Map<string, MarketData>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -27,18 +31,13 @@ const MarketPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<MarketType>('spot');
 
-  // Fetch list of all markets
+  // Fetch list of spot markets
   const fetchMarkets = async () => {
     try {
-      const [spotResponse, futuresResponse] = await Promise.all([
-        apiService.getAllSpotMarkets(),
-        apiService.getAllFuturesContracts()
-      ]);
-      
+      const spotResponse = await apiService.getAllSpotMarkets();
       setSpotMarkets(spotResponse.data || []);
-      setFuturesMarkets(futuresResponse.data || []);
     } catch (err: any) {
-      console.error('Error fetching markets:', err);
+      console.error('Error fetching spot markets:', err);
       setError(err.response?.data?.message || 'Failed to fetch markets list');
     }
   };
@@ -72,13 +71,13 @@ const MarketPage: React.FC = () => {
         }
       });
 
-      // Fetch futures market data
-      const futuresDataMap = new Map<string, MarketData>();
-      const futuresPromises = futuresMarkets.slice(0, 50).map(async (contract) => {
+      // Fetch futures market data — retain last known price; never drop a symbol
+      const freshFuturesMap = new Map<string, MarketData>();
+      const futuresPromises = futuresMarkets.map(async (contract) => {
         try {
           const response = await apiService.getLatestFuturesPrice(contract);
           if (response.data) {
-            futuresDataMap.set(contract, {
+            freshFuturesMap.set(contract, {
               market: contract,
               price: response.data.lastPrice || response.data.markPrice || '0',
               volume: response.data.volume,
@@ -90,15 +89,21 @@ const MarketPage: React.FC = () => {
             });
           }
         } catch (err) {
-          // Skip contracts with no data
           console.debug(`No data for futures contract: ${contract}`);
         }
       });
 
       await Promise.all([...spotPromises, ...futuresPromises]);
-      
+
       setSpotData(spotDataMap);
-      setFuturesData(futuresDataMap);
+      // Only overwrite entries where fresh data arrived; keep everything else
+      setFuturesData(prev => {
+        const merged = new Map(prev);
+        for (const [k, v] of freshFuturesMap) {
+          merged.set(k, v);
+        }
+        return merged;
+      });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch market data');
     } finally {
@@ -111,22 +116,22 @@ const MarketPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (spotMarkets.length > 0 || futuresMarkets.length > 0) {
-      fetchMarketData();
-      // Refresh every 10 seconds for real-time data
-      const interval = setInterval(fetchMarketData, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [spotMarkets, futuresMarkets]);
+    // Futures symbols are hardcoded; always fetch futures + spot when spot markets are ready
+    fetchMarketData();
+    const interval = setInterval(fetchMarketData, 10000);
+    return () => clearInterval(interval);
+  }, [spotMarkets]);
 
   // Get filtered data based on active tab
   const getFilteredData = () => {
-    const dataMap = activeTab === 'spot' ? spotData : futuresData;
-    const markets = activeTab === 'spot' ? spotMarkets : futuresMarkets;
-    
-    return markets
+    if (activeTab === 'futures') {
+      return futuresMarkets
+        .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(market => futuresData.get(market) ?? { market, price: '' });
+    }
+    return spotMarkets
       .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
-      .map(market => dataMap.get(market))
+      .map(market => spotData.get(market))
       .filter(data => data !== undefined) as MarketData[];
   };
 
@@ -194,7 +199,12 @@ const MarketPage: React.FC = () => {
           const open = parseFloat(data.open || '0');
           
           return (
-            <div key={data.market} className="ticker-card">
+            <div
+              key={data.market}
+              className="ticker-card"
+              onClick={() => navigate(`/chart/${activeTab}/${encodeURIComponent(data.market)}`)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="ticker-header">
                 <h3>{data.market}</h3>
                 {price > low ? (
@@ -205,7 +215,10 @@ const MarketPage: React.FC = () => {
               </div>
               
               <div className="ticker-price">
-                ₹{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                {data.price
+                  ? `\u20b9${parseFloat(data.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                  : <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Awaiting data…</span>
+                }
               </div>
               
               <div className="ticker-details">

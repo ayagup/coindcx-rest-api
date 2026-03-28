@@ -2,9 +2,13 @@ package com.coindcx.springclient.controller;
 
 import com.coindcx.springclient.entity.WebSocketFuturesData;
 import com.coindcx.springclient.entity.WebSocketSpotData;
+import com.coindcx.springclient.model.WebSocketFuturesCurrentPricesData;
+import com.coindcx.springclient.repository.WebSocketFuturesCurrentPricesDataRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesDataRepository;
 import com.coindcx.springclient.repository.WebSocketSpotDataRepository;
 import com.coindcx.springclient.service.CoinDCXWebSocketService;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -16,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * REST Controller for WebSocket data storage management
@@ -26,15 +31,18 @@ public class WebSocketDataController {
 
     private final WebSocketSpotDataRepository spotDataRepository;
     private final WebSocketFuturesDataRepository futuresDataRepository;
+    private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
     private final CoinDCXWebSocketService webSocketService;
 
     @Autowired
     public WebSocketDataController(
             WebSocketSpotDataRepository spotDataRepository,
             WebSocketFuturesDataRepository futuresDataRepository,
+            WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
             CoinDCXWebSocketService webSocketService) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
+        this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
         this.webSocketService = webSocketService;
     }
 
@@ -148,17 +156,64 @@ public class WebSocketDataController {
     }
 
     /**
-     * Get latest mark price for a futures contract
+     * Get latest mark price for a futures contract.
+     * First checks WebSocketFuturesData; falls back to the live
+     * currentPrices@futures#update snapshot (keys stored as e.g. "B-BTC_USDT").
+     * Also accepts short-form symbols like "BTCUSDT" by normalising the key.
      */
     @GetMapping("/futures/{contractSymbol}/latest-price")
     public ResponseEntity<WebSocketFuturesData> getLatestFuturesPrice(@PathVariable String contractSymbol) {
         WebSocketFuturesData data = futuresDataRepository.findLatestMarkPrice(contractSymbol);
-        
-        if (data == null) {
+        if (data != null) {
+            return ResponseEntity.ok(data);
+        }
+
+        // Fall back to the live current-prices snapshot
+        Optional<WebSocketFuturesCurrentPricesData> latestSnapshot =
+                futuresCurrentPricesDataRepository.findLatestByRecordTimestamp();
+        if (latestSnapshot.isEmpty() || latestSnapshot.get().getPrices() == null) {
             return ResponseEntity.notFound().build();
         }
-        
-        return ResponseEntity.ok(data);
+
+        try {
+            JsonObject prices = JsonParser.parseString(latestSnapshot.get().getPrices()).getAsJsonObject();
+
+            // Try exact match first (e.g. "B-BTC_USDT"), then normalised match (e.g. "BTCUSDT")
+            String matchedKey = null;
+            if (prices.has(contractSymbol)) {
+                matchedKey = contractSymbol;
+            } else {
+                for (String key : prices.keySet()) {
+                    String normalised = key.replaceFirst("^B-", "").replace("_", "");
+                    if (normalised.equalsIgnoreCase(contractSymbol)) {
+                        matchedKey = key;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedKey == null || !prices.get(matchedKey).isJsonObject()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            JsonObject priceEntry = prices.getAsJsonObject(matchedKey);
+            if (!priceEntry.has("mp") || priceEntry.get("mp").isJsonNull()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            WebSocketFuturesData syntheticData = new WebSocketFuturesData();
+            syntheticData.setContractSymbol(contractSymbol);
+            syntheticData.setChannelName("currentPrices@futures@rt");
+            syntheticData.setEventType("price-change");
+            syntheticData.setMarkPrice(priceEntry.get("mp").getAsBigDecimal());
+            syntheticData.setTimestamp(LocalDateTime.now());
+            if (latestSnapshot.get().getTimestamp() != null) {
+                syntheticData.setExchangeTimestamp(latestSnapshot.get().getTimestamp());
+            }
+            return ResponseEntity.ok(syntheticData);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
