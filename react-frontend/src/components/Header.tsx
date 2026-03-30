@@ -11,7 +11,8 @@ import {
   Activity,
   LogOut,
   Key,
-  Wifi
+  Wifi,
+  Settings2
 } from 'lucide-react';
 
 const Header: React.FC = () => {
@@ -65,6 +66,11 @@ const Header: React.FC = () => {
             </>
           )}
           
+          <Link to="/trade-config" className={isActive('/trade-config') ? 'nav-link active' : 'nav-link'}>
+            <Settings2 size={18} />
+            <span>Config</span>
+          </Link>
+
           <Link to="/websocket" className={isActive('/websocket') ? 'nav-link active' : 'nav-link'}>
             <Wifi size={18} />
             <span>WebSocket</span>

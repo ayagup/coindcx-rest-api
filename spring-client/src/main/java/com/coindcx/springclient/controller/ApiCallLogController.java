@@ -6,6 +6,10 @@ import com.coindcx.springclient.service.ApiCallLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,12 +34,25 @@ public class ApiCallLogController {
     }
 
     /**
-     * Get all API call logs
-     * Example: GET /api/logs
+     * Get all API call logs with pagination
+     * Example: GET /api/logs?page=0&size=20&sort=timestamp,desc
      */
     @GetMapping
-    public ResponseEntity<List<ApiCallLog>> getAllLogs() {
-        List<ApiCallLog> logs = apiCallLogService.getAllLogs();
+    @Operation(summary = "Get all API call logs with pagination", 
+               description = "Returns paginated API call logs. Default page=0, size=20, sorted by timestamp descending")
+    public ResponseEntity<Page<ApiCallLog>> getAllLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "timestamp,desc") String[] sort) {
+        
+        // Parse sort parameter
+        Sort.Direction direction = sort.length > 1 && sort[1].equalsIgnoreCase("asc") 
+                ? Sort.Direction.ASC 
+                : Sort.Direction.DESC;
+        String property = sort[0];
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, property));
+        Page<ApiCallLog> logs = apiCallLogService.getAllLogs(pageable);
         return ResponseEntity.ok(logs);
     }
 

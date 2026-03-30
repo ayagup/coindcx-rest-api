@@ -50,6 +50,9 @@ public class CoinDCXWebSocketService {
     // Track event handlers
     private final Map<String, EventHandler> eventHandlers = new ConcurrentHashMap<>();
 
+    // Track which Socket.IO event names already have a listener registered (prevents duplicate listeners)
+    private final Set<String> registeredSocketListeners = ConcurrentHashMap.newKeySet();
+
     @Autowired
     public CoinDCXWebSocketService(
             WebSocketConfig config,
@@ -176,6 +179,8 @@ public class CoinDCXWebSocketService {
             options.reconnection = false; // We handle reconnection manually
             options.timeout = 10000; // 10 second timeout
 
+            // Clear registered listeners so reconnect registers fresh ones on new socket
+            registeredSocketListeners.clear();
             socket = IO.socket(uri, options);
 
             setupEventListeners();
@@ -229,17 +234,40 @@ public class CoinDCXWebSocketService {
             if (config.getApiKey() != null && !config.getApiKey().isEmpty()) {
                 logger.info("Auto-subscribing to futures channels...");
 
+                // Subscribe to the private "coindcx" channel — delivers balance-update,
+                // order-update and trade-update events for the authenticated account.
+                subscribeToPrivateChannel(
+                    WebSocketChannels.CHANNEL_PRIVATE_COINDCX,
+                    WebSocketChannels.EVENT_BALANCE_UPDATE,
+                    true
+                );
+                subscribeToPrivateChannel(
+                    WebSocketChannels.CHANNEL_PRIVATE_COINDCX,
+                    WebSocketChannels.EVENT_ORDER_UPDATE,
+                    true
+                );
+                subscribeToPrivateChannel(
+                    WebSocketChannels.CHANNEL_PRIVATE_COINDCX,
+                    WebSocketChannels.EVENT_TRADE_UPDATE,
+                    true
+                );
+
                 subscribeToPrivateChannel(
                     WebSocketChannels.CHANNEL_PRIVATE_FUTURES_BTC_NEW_TRADES,
                     WebSocketChannels.EVENT_NEW_TRADE,
                     true
                 );
 
-                subscribeToPrivateChannel(
-                    WebSocketChannels.CHANNEL_PRIVATE_FUTURES_BTC_PRICE_1M,
-                    WebSocketChannels.EVENT_CANDLESTICK,
-                    true
-                );
+                // Subscribe to all 4 futures pairs × direct timeframes (1m, 5m, 1h, 1d)
+                String[] futuresPairs = {"B-BTC_USDT", "B-ETH_USDT", "B-XAG_USDT", "B-XAU_USDT"};
+                String[] futuresIntervals = {"1m", "5m", "1h", "1d"};
+                for (String futurePair : futuresPairs) {
+                    for (String futureInterval : futuresIntervals) {
+                        String candlestickChannel = WebSocketChannels.buildCandlestickChannel(futurePair, futureInterval) + "-futures";
+                        logger.info("Auto-subscribing to channel: {}", candlestickChannel);
+                        subscribeToPrivateChannel(candlestickChannel, WebSocketChannels.EVENT_CANDLESTICK, true);
+                    }
+                }
 
                 subscribeToPrivateChannel(
                     WebSocketChannels.CHANNEL_PRIVATE_FUTURES_BTC_DEPTH_UPDATE,
@@ -295,30 +323,53 @@ public class CoinDCXWebSocketService {
         // Register event handler for message processing
         registerEventHandler(channelName, eventName, persistToDatabase);
 
-        // Setup Socket.IO event listener
+        // Setup Socket.IO event listener — only register ONCE per event name to avoid duplicate processing
+        if (registeredSocketListeners.add(eventName)) {
         socket.on(eventName, args -> {
             if (args.length > 0) {
                 Object rawData = args[0];
                 logger.debug("📨 Raw Socket.IO data: {}", rawData.toString().length() > 200 ? rawData.toString().substring(0, 200) + "..." : rawData);
 
-                // Extract the actual data from Socket.IO message format for display
-                Object actualData = extractDataFromSocketIOMessage(rawData);
+                // Extract the inner data JSON string from Socket.IO wrapper
+                String innerDataString = extractInnerDataString(rawData);
 
-                logger.debug("✅ Received {} event from channel '{}': {}", eventName, channelName,
-                           actualData.toString().length() > 200 ? actualData.toString().substring(0, 200) + "..." : actualData);
+                if (innerDataString != null) {
+                    logger.debug("📦 Received {} event from channel '{}': {}", eventName, channelName,
+                               innerDataString.length() > 200 ? innerDataString.substring(0, 200) + "..." : innerDataString);
 
-                // Store extracted data in memory for backward compatibility
-                storeMessage(eventName, actualData);
+                    // Parse to Map for in-memory storage (backward compatibility)
+                    try {
+                        JsonElement parsed = JsonParser.parseString(innerDataString);
+                        if (parsed.isJsonObject()) {
+                            Map<String, Object> dataMap = gson.fromJson(parsed, Map.class);
+                            storeMessage(eventName, dataMap);
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not parse data as JSON for in-memory storage: {}", e.getMessage());
+                    }
 
-                // Call registered event handler for persistence - pass rawData for proper parsing
-                String handlerKey = channelName + ":" + eventName;
-                EventHandler handler = eventHandlers.get(handlerKey);
-                if (handler != null) {
-                    // Pass rawData instead of actualData so persistence service gets the full Socket.IO format
-                    handler.handle(rawData, channelName, persistToDatabase);
+                    // Route to handler: find matching handler by extracting channel from data, fallback to iterating by eventName
+                    String resolvedChannel = extractChannelFromData(innerDataString);
+                    String handlerKey = (resolvedChannel != null ? resolvedChannel : channelName) + ":" + eventName;
+                    EventHandler handler = eventHandlers.get(handlerKey);
+                    if (handler == null) {
+                        // Fallback: find any handler registered for this eventName
+                        handler = eventHandlers.entrySet().stream()
+                            .filter(e -> e.getKey().endsWith(":" + eventName))
+                            .map(Map.Entry::getValue)
+                            .findFirst().orElse(null);
+                    }
+                    if (handler != null) {
+                        String effectiveChannel = resolvedChannel != null ? resolvedChannel : channelName;
+                        logger.debug("💾 Processing event '{}' from channel '{}'", eventName, effectiveChannel);
+                        handler.handle(innerDataString, effectiveChannel, persistToDatabase);
+                    }
+                } else {
+                    logger.warn("Could not extract inner data string from Socket.IO message");
                 }
             }
         });
+        } // end registeredSocketListeners.add check
 
         // Send join message (public channels don't need authentication)
         Map<String, String> joinData = new HashMap<>();
@@ -361,30 +412,53 @@ public class CoinDCXWebSocketService {
         // Register event handler for message processing
         registerEventHandler(channelName, eventName, persistToDatabase);
 
-        // Setup Socket.IO event listener
+        // Setup Socket.IO event listener — only register ONCE per event name to avoid duplicate processing
+        if (registeredSocketListeners.add(eventName)) {
         socket.on(eventName, args -> {
             if (args.length > 0) {
                 Object rawData = args[0];
                 logger.debug("📨 Raw Socket.IO data: {}", rawData.toString().length() > 200 ? rawData.toString().substring(0, 200) + "..." : rawData);
 
-                // Extract the actual data from Socket.IO message format for display
-                Object actualData = extractDataFromSocketIOMessage(rawData);
+                // Extract the inner data JSON string from Socket.IO wrapper
+                String innerDataString = extractInnerDataString(rawData);
 
-                logger.debug("✅ Received {} event from channel '{}': {}", eventName, channelName,
-                           actualData.toString().length() > 200 ? actualData.toString().substring(0, 200) + "..." : actualData);
+                if (innerDataString != null) {
+                    logger.debug("📦 Received {} event from channel '{}': {}", eventName, channelName,
+                               innerDataString.length() > 200 ? innerDataString.substring(0, 200) + "..." : innerDataString);
 
-                // Store extracted data in memory for backward compatibility
-                storeMessage(eventName, actualData);
+                    // Parse to Map for in-memory storage (backward compatibility)
+                    try {
+                        JsonElement parsed = JsonParser.parseString(innerDataString);
+                        if (parsed.isJsonObject()) {
+                            Map<String, Object> dataMap = gson.fromJson(parsed, Map.class);
+                            storeMessage(eventName, dataMap);
+                        }
+                    } catch (Exception e) {
+                        logger.debug("Could not parse data as JSON for in-memory storage: {}", e.getMessage());
+                    }
 
-                // Call registered event handler for persistence - pass rawData for proper parsing
-                String handlerKey = channelName + ":" + eventName;
-                EventHandler handler = eventHandlers.get(handlerKey);
-                if (handler != null) {
-                    // Pass rawData instead of actualData so persistence service gets the full Socket.IO format
-                    handler.handle(rawData, channelName, persistToDatabase);
+                    // Route to handler: extract channel from data payload for correct routing
+                    String resolvedChannel = extractChannelFromData(innerDataString);
+                    String handlerKey = (resolvedChannel != null ? resolvedChannel : channelName) + ":" + eventName;
+                    EventHandler handler = eventHandlers.get(handlerKey);
+                    if (handler == null) {
+                        // Fallback: find any handler registered for this eventName
+                        handler = eventHandlers.entrySet().stream()
+                            .filter(e -> e.getKey().endsWith(":" + eventName))
+                            .map(Map.Entry::getValue)
+                            .findFirst().orElse(null);
+                    }
+                    if (handler != null) {
+                        String effectiveChannel = resolvedChannel != null ? resolvedChannel : channelName;
+                        logger.debug("💾 Processing event '{}' from channel '{}'", eventName, effectiveChannel);
+                        handler.handle(innerDataString, effectiveChannel, persistToDatabase);
+                    }
+                } else {
+                    logger.warn("Could not extract inner data string from Socket.IO message");
                 }
             }
         });
+        } // end registeredSocketListeners.add check
 
         // Generate authentication signature
         String signature = generateSignature(channelName, apiSecret);
@@ -454,6 +528,7 @@ public class CoinDCXWebSocketService {
                     persistenceService.saveSpotPriceChangeData(data, channel);
                 } else if (WebSocketChannels.EVENT_BALANCE_UPDATE.equals(eventName)) {
                     persistenceService.saveSpotBalanceData(data);
+                    persistenceService.saveBalanceUpdateData(data, channel);
                 } else if (WebSocketChannels.EVENT_ORDER_UPDATE.equals(eventName)) {
                     persistenceService.saveSpotOrderUpdateData(data);
                 } else if (WebSocketChannels.EVENT_TRADE_UPDATE.equals(eventName)) {
@@ -543,6 +618,67 @@ public class CoinDCXWebSocketService {
             return "CONNECTED";
         }
         return "DISCONNECTED";
+    }
+
+    /**
+     * Extract the inner data JSON string from Socket.IO message format
+     * Socket.IO sends: {"event":"...", "data":"{...JSON string...}"}
+     * Returns the inner JSON string directly for persistence service to parse
+     */
+    private String extractInnerDataString(Object rawData) {
+        try {
+            if (rawData instanceof org.json.JSONObject) {
+                org.json.JSONObject jsonObject = (org.json.JSONObject) rawData;
+                if (jsonObject.has("data")) {
+                    Object dataValue = jsonObject.get("data");
+                    if (dataValue instanceof String) {
+                        return (String) dataValue;
+                    } else {
+                        // Could be a JSONArray or nested JSONObject — return as string
+                        return dataValue.toString();
+                    }
+                }
+                // No "data" wrapper — the JSONObject IS the payload
+                return jsonObject.toString();
+
+            } else if (rawData instanceof org.json.JSONArray) {
+                // Direct array payload (e.g. balance-update sends an array)
+                return rawData.toString();
+
+            } else if (rawData instanceof java.util.Map) {
+                java.util.Map<?, ?> dataMap = (java.util.Map<?, ?>) rawData;
+                if (dataMap.containsKey("data")) {
+                    Object dataValue = dataMap.get("data");
+                    if (dataValue instanceof String) {
+                        return (String) dataValue;
+                    } else {
+                        return gson.toJson(dataValue);
+                    }
+                }
+                // No "data" wrapper — the Map IS the payload
+                return gson.toJson(dataMap);
+
+            } else if (rawData instanceof String) {
+                String rawJson = (String) rawData;
+                try {
+                    JsonElement parsed = JsonParser.parseString(rawJson);
+                    if (parsed.isJsonObject() && parsed.getAsJsonObject().has("data")) {
+                        return parsed.getAsJsonObject().get("data").getAsString();
+                    }
+                } catch (Exception ignored) { }
+                // Already a plain JSON string — return as-is
+                return rawJson;
+            }
+
+            // Final fallback — use toString() of whatever object was received
+            logger.debug("extractInnerDataString: using toString() fallback for type {}",
+                         rawData.getClass().getName());
+            return rawData.toString();
+
+        } catch (Exception e) {
+            logger.error("Error extracting inner data string: {}", e.getMessage(), e);
+            return null;
+        }
     }
 
     /**
@@ -659,8 +795,8 @@ public class CoinDCXWebSocketService {
                     return rawData;
                 }
             } else {
-                // Unknown type, return as-is
-                logger.warn("⚠️ Unknown data type: {}, returning original", rawData.getClass());
+                // Unknown type, log warning and return as-is
+                logger.warn("⚠️ Unknown data type: {}, returning original", rawData.getClass().getName());
                 return rawData;
             }
         } catch (Exception e) {
@@ -668,6 +804,33 @@ public class CoinDCXWebSocketService {
             // Return original data if parsing fails
             return rawData;
         }
+    }
+
+    /**
+     * Extract the channel name from the inner data JSON payload.
+     * CoinDCX candlestick data contains a "channel" field in the root JSON.
+     */
+    private String extractChannelFromData(String innerDataString) {
+        if (innerDataString == null) return null;
+        try {
+            JsonObject root = JsonParser.parseString(innerDataString).getAsJsonObject();
+            if (root.has("channel") && !root.get("channel").isJsonNull()) {
+                return root.get("channel").getAsString();
+            }
+            // Also check inside "data" array items for "pair"+"duration" based channel reconstruction
+            if (root.has("data") && root.get("data").isJsonArray()) {
+                com.google.gson.JsonArray arr = root.getAsJsonArray("data");
+                if (arr.size() > 0) {
+                    JsonObject first = arr.get(0).getAsJsonObject();
+                    if (first.has("pair") && first.has("duration")) {
+                        // reconstructed channel is not needed for routing; return null and let fallback handle it
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not extract channel from data: {}", e.getMessage());
+        }
+        return null;
     }
 
     /**

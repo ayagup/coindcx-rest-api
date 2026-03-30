@@ -1,17 +1,33 @@
 package com.coindcx.springclient.controller;
 
+import com.coindcx.springclient.config.WebSocketConfig;
 import com.coindcx.springclient.entity.WebSocketFuturesPositionUpdateData;
 import com.coindcx.springclient.repository.WebSocketFuturesPositionUpdateDataRepository;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 @RestController
@@ -19,8 +35,17 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class WebSocketFuturesPositionUpdateController {
 
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketFuturesPositionUpdateController.class);
+    private static final String POSITIONS_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/positions";
+    private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
+
     @Autowired
     private WebSocketFuturesPositionUpdateDataRepository repository;
+
+    @Autowired
+    private WebSocketConfig webSocketConfig;
+
+    private final OkHttpClient httpClient = new OkHttpClient();
 
     /**
      * Get overall statistics
@@ -147,12 +172,21 @@ public class WebSocketFuturesPositionUpdateController {
     }
 
     /**
-     * Get positions by status (active/inactive)
+     * Get positions by status. Falls back to CoinDCX REST API when DB is empty.
+     * Accepted status values: "active", "closed" (maps to inactive/zero position).
      */
     @GetMapping("/status/{status}")
     public ResponseEntity<List<WebSocketFuturesPositionUpdateData>> getByStatus(
             @PathVariable String status) {
-        return ResponseEntity.ok(repository.findByStatusOrderByUpdateTimestampDesc(status));
+        List<WebSocketFuturesPositionUpdateData> data = repository.findByStatusOrderByUpdateTimestampDesc(status);
+        // Also try "inactive" alias for "closed"
+        if ((data == null || data.isEmpty()) && "closed".equalsIgnoreCase(status)) {
+            data = repository.findByStatusOrderByUpdateTimestampDesc("inactive");
+        }
+        if (data == null || data.isEmpty()) {
+            data = fetchPositionsFromRestApi(status, 100);
+        }
+        return ResponseEntity.ok(data != null ? data : Collections.emptyList());
     }
 
     /**
@@ -208,12 +242,17 @@ public class WebSocketFuturesPositionUpdateController {
     }
 
     /**
-     * Get recent position updates
+     * Get recent position updates. Falls back to CoinDCX REST API when DB is empty.
      */
     @GetMapping("/recent/{limit}")
     public ResponseEntity<List<WebSocketFuturesPositionUpdateData>> getRecent(
             @PathVariable int limit) {
-        return ResponseEntity.ok(repository.findRecentPositionUpdates(Math.min(limit, 1000)));
+        int cap = Math.min(limit, 1000);
+        List<WebSocketFuturesPositionUpdateData> data = repository.findRecentPositionUpdates(cap);
+        if (data == null || data.isEmpty()) {
+            data = fetchPositionsFromRestApi(null, cap);
+        }
+        return ResponseEntity.ok(data != null ? data : Collections.emptyList());
     }
 
     /**
@@ -300,11 +339,22 @@ public class WebSocketFuturesPositionUpdateController {
     @GetMapping("/total-unrealized-pnl")
     public ResponseEntity<Map<String, Double>> getTotalUnrealizedPnl() {
         List<Object[]> results = repository.getTotalUnrealizedPnlByPair();
-        Map<String, Double> pnlMap = results.stream()
-                .collect(Collectors.toMap(
-                        r -> (String) r[0],
-                        r -> r[1] != null ? ((Number) r[1]).doubleValue() : 0.0
-                ));
+        if (!results.isEmpty()) {
+            Map<String, Double> pnlMap = results.stream()
+                    .collect(Collectors.toMap(
+                            r -> (String) r[0],
+                            r -> r[1] != null ? ((Number) r[1]).doubleValue() : 0.0
+                    ));
+            return ResponseEntity.ok(pnlMap);
+        }
+        // REST fallback: fetch active positions and compute unrealized PnL per pair
+        List<WebSocketFuturesPositionUpdateData> positions = fetchPositionsFromRestApi("active", 100);
+        Map<String, Double> pnlMap = new HashMap<>();
+        for (WebSocketFuturesPositionUpdateData pos : positions) {
+            if (pos.getPair() != null && pos.getUnrealizedPnl() != null) {
+                pnlMap.merge(pos.getPair(), pos.getUnrealizedPnl(), Double::sum);
+            }
+        }
         return ResponseEntity.ok(pnlMap);
     }
 
@@ -314,11 +364,26 @@ public class WebSocketFuturesPositionUpdateController {
     @GetMapping("/total-realized-pnl")
     public ResponseEntity<Map<String, Double>> getTotalRealizedPnl() {
         List<Object[]> results = repository.getTotalRealizedPnlByPair();
-        Map<String, Double> pnlMap = results.stream()
-                .collect(Collectors.toMap(
-                        r -> (String) r[0],
-                        r -> r[1] != null ? ((Number) r[1]).doubleValue() : 0.0
-                ));
+        if (!results.isEmpty()) {
+            Map<String, Double> pnlMap = results.stream()
+                    .collect(Collectors.toMap(
+                            r -> (String) r[0],
+                            r -> r[1] != null ? ((Number) r[1]).doubleValue() : 0.0
+                    ));
+            return ResponseEntity.ok(pnlMap);
+        }
+        // REST fallback: fetch closed positions and sum realized PnL per pair.
+        // CoinDCX does not expose realized_pnl in the positions API so values will
+        // be 0 per pair, but the map keys correctly reflect all traded pairs.
+        List<WebSocketFuturesPositionUpdateData> positions = fetchPositionsFromRestApi("closed", 100);
+        Map<String, Double> pnlMap = new HashMap<>();
+        for (WebSocketFuturesPositionUpdateData pos : positions) {
+            if (pos.getPair() != null) {
+                pnlMap.merge(pos.getPair(),
+                        pos.getRealizedPnl() != null ? pos.getRealizedPnl() : 0.0,
+                        Double::sum);
+            }
+        }
         return ResponseEntity.ok(pnlMap);
     }
 
@@ -447,5 +512,137 @@ public class WebSocketFuturesPositionUpdateController {
         result.put("cutoffDate", cutoff);
         
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Fetch futures positions from the CoinDCX REST API.
+     * @param statusFilter "active", "closed", or null (all). In-memory only — not persisted.
+     */
+    private List<WebSocketFuturesPositionUpdateData> fetchPositionsFromRestApi(String statusFilter, int limit) {
+        String apiKey = webSocketConfig.getApiKey();
+        String apiSecret = webSocketConfig.getApiSecret();
+        if (apiKey == null || apiKey.isEmpty() || apiSecret == null || apiSecret.isEmpty()) {
+            logger.debug("REST fallback skipped: API credentials not configured");
+            return Collections.emptyList();
+        }
+        try {
+            long timestamp = System.currentTimeMillis();
+            int size = Math.min(limit, 100);
+            String payload = "{\"timestamp\":\"" + timestamp + "\",\"page\":\"1\",\"size\":\"" + size + "\"}";
+            String signature = hmacSha256(payload, apiSecret);
+
+            RequestBody body = RequestBody.create(payload, JSON_MEDIA_TYPE);
+            Request request = new Request.Builder()
+                    .url(POSITIONS_URL)
+                    .post(body)
+                    .addHeader("X-AUTH-APIKEY", apiKey)
+                    .addHeader("X-AUTH-SIGNATURE", signature)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    logger.warn("REST fallback positions: HTTP {}", response.code());
+                    return Collections.emptyList();
+                }
+                String bodyStr = response.body() != null ? response.body().string() : null;
+                if (bodyStr == null || bodyStr.isBlank()) return Collections.emptyList();
+
+                // Response may be array or {"positions": [...]}
+                JsonArray arr = null;
+                JsonElement parsed = JsonParser.parseString(bodyStr);
+                if (parsed.isJsonArray()) {
+                    arr = parsed.getAsJsonArray();
+                } else if (parsed.isJsonObject()) {
+                    JsonObject obj = parsed.getAsJsonObject();
+                    if (obj.has("positions") && obj.get("positions").isJsonArray())
+                        arr = obj.getAsJsonArray("positions");
+                    else if (obj.has("data") && obj.get("data").isJsonArray())
+                        arr = obj.getAsJsonArray("data");
+                }
+                if (arr == null) return Collections.emptyList();
+
+                List<WebSocketFuturesPositionUpdateData> result = new ArrayList<>();
+                for (JsonElement el : arr) {
+                    if (!el.isJsonObject()) continue;
+                    JsonObject p = el.getAsJsonObject();
+
+                    WebSocketFuturesPositionUpdateData entity = new WebSocketFuturesPositionUpdateData();
+                    mapPositionJsonToEntity(p, entity);
+                    entity.setChannelName("rest-api");
+
+                    // Filter by requested status
+                    if (statusFilter != null && !statusFilter.isBlank()) {
+                        String es = entity.getStatus();
+                        boolean match = statusFilter.equalsIgnoreCase(es)
+                                || ("closed".equalsIgnoreCase(statusFilter) && "inactive".equalsIgnoreCase(es));
+                        if (!match) continue;
+                    }
+                    result.add(entity);
+                }
+                return result;
+            }
+        } catch (Exception e) {
+            logger.warn("REST fallback positions failed: {}", e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
+    /** Map a REST API position JSON object to an entity instance. */
+    private void mapPositionJsonToEntity(JsonObject j, WebSocketFuturesPositionUpdateData e) {
+        if (j.has("id") && !j.get("id").isJsonNull()) e.setPositionId(j.get("id").getAsString());
+        if (j.has("pair") && !j.get("pair").isJsonNull()) e.setPair(j.get("pair").getAsString());
+        if (j.has("avg_price") && !j.get("avg_price").isJsonNull()) e.setEntryPrice(j.get("avg_price").getAsDouble());
+        if (j.has("mark_price") && !j.get("mark_price").isJsonNull()) e.setCurrentPrice(j.get("mark_price").getAsDouble());
+        if (j.has("liquidation_price") && !j.get("liquidation_price").isJsonNull()) e.setLiquidationPrice(j.get("liquidation_price").getAsDouble());
+        if (j.has("leverage") && !j.get("leverage").isJsonNull()) e.setLeverage(j.get("leverage").getAsDouble());
+        if (j.has("locked_margin") && !j.get("locked_margin").isJsonNull()) e.setMargin(j.get("locked_margin").getAsDouble());
+        if (j.has("locked_user_margin") && !j.get("locked_user_margin").isJsonNull()) e.setInitialMargin(j.get("locked_user_margin").getAsDouble());
+        if (j.has("maintenance_margin") && !j.get("maintenance_margin").isJsonNull()) e.setMaintenanceMargin(j.get("maintenance_margin").getAsDouble());
+        if (j.has("margin_type") && !j.get("margin_type").isJsonNull()) e.setPositionMarginType(j.get("margin_type").getAsString());
+        if (j.has("margin_currency_short_name") && !j.get("margin_currency_short_name").isJsonNull()) e.setMarginCurrency(j.get("margin_currency_short_name").getAsString());
+        if (j.has("updated_at") && !j.get("updated_at").isJsonNull()) e.setUpdateTimestamp(j.get("updated_at").getAsLong());
+
+        // Determine quantity and side from active_pos
+        double activePos = 0;
+        if (j.has("active_pos") && !j.get("active_pos").isJsonNull()) {
+            activePos = j.get("active_pos").getAsDouble();
+            e.setQuantity(activePos);
+        }
+        if (activePos > 0) {
+            e.setSide("long");
+            e.setStatus("active");
+        } else if (activePos < 0) {
+            e.setSide("short");
+            e.setStatus("active");
+        } else {
+            double inactiveBuy = j.has("inactive_pos_buy") && !j.get("inactive_pos_buy").isJsonNull() ? j.get("inactive_pos_buy").getAsDouble() : 0;
+            double inactiveSell = j.has("inactive_pos_sell") && !j.get("inactive_pos_sell").isJsonNull() ? j.get("inactive_pos_sell").getAsDouble() : 0;
+            e.setSide(inactiveBuy != 0 ? "long" : (inactiveSell != 0 ? "short" : "long"));
+            e.setStatus("closed");  // use "closed" for REST fallback (frontend expects "closed")
+            // Restore quantity from inactive positions if present
+            if (inactiveBuy != 0) e.setQuantity(inactiveBuy);
+            else if (inactiveSell != 0) e.setQuantity(Math.abs(inactiveSell));
+        }
+
+        // Calculate PnL if we have the needed prices
+        if (e.getQuantity() != null && e.getEntryPrice() != null && e.getCurrentPrice() != null && e.getQuantity() != 0) {
+            double unrealizedPnl = e.getQuantity() * (e.getCurrentPrice() - e.getEntryPrice());
+            e.setUnrealizedPnl(unrealizedPnl);
+            e.setTotalPnl(unrealizedPnl);
+            if (e.getMargin() != null && e.getMargin() != 0) {
+                e.setRoi((unrealizedPnl / e.getMargin()) * 100);
+            }
+        }
+        // Map realized_pnl if available directly from REST response
+        if (j.has("realized_pnl") && !j.get("realized_pnl").isJsonNull()) e.setRealizedPnl(j.get("realized_pnl").getAsDouble());
+
+        e.setRecordTimestamp(LocalDateTime.now());
+    }
+
+    /** Generate HMAC-SHA256 hex signature. */
+    private String hmacSha256(String data, String secret) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
     }
 }

@@ -3,6 +3,8 @@ package com.coindcx.springclient.dao;
 import com.coindcx.springclient.entity.ApiCallLog;
 import com.coindcx.springclient.repository.ApiCallLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +49,14 @@ public class ApiCallLogDao {
     }
 
     /**
-     * Find all logs
+     * Find all logs with pagination
+     */
+    public Page<ApiCallLog> findAll(Pageable pageable) {
+        return repository.findAll(pageable);
+    }
+
+    /**
+     * Find all logs (non-paginated)
      */
     public List<ApiCallLog> findAll() {
         return repository.findAll();

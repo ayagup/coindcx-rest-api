@@ -1,0 +1,2072 @@
+{
+  "info": {
+    "name": "CoinDCX Spring Client API",
+    "description": "Complete REST API collection for CoinDCX Spring Boot client - includes spot trading, futures, margin, lending, wallet operations, and WebSocket data queries",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "coindcx-spring-client"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "key",
+        "value": "X-AUTH-APIKEY",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "your_api_key_here",
+      "type": "string"
+    },
+    {
+      "key": "api_secret",
+      "value": "your_api_secret_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Hello World",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/hello",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hello"]
+            }
+          }
+        },
+        {
+          "name": "Home",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/",
+              "host": ["{{base_url}}"],
+              "path": ["api", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "API Call Logs",
+      "item": [
+        {
+          "name": "Get All Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs?page=0&size=20&sort=timestamp,desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0",
+                  "description": "Page number (0-indexed)"
+                },
+                {
+                  "key": "size",
+                  "value": "20",
+                  "description": "Number of items per page"
+                },
+                {
+                  "key": "sort",
+                  "value": "timestamp,desc",
+                  "description": "Sort field and direction (e.g., timestamp,desc or serviceName,asc)"
+                }
+              ]
+            },
+            "description": "Get paginated API call logs. Returns Page object with content, totalElements, totalPages, etc."
+          }
+        },
+        {
+          "name": "Get Logs by Service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/service/:serviceName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "service", ":serviceName"],
+              "variable": [
+                {
+                  "key": "serviceName",
+                  "value": "OrderService"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Logs by Service and Method",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/service/:serviceName/method/:methodName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "service", ":serviceName", "method", ":methodName"],
+              "variable": [
+                {
+                  "key": "serviceName",
+                  "value": "OrderService"
+                },
+                {
+                  "key": "methodName",
+                  "value": "createOrder"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Logs in Time Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/range?start=2024-01-01T00:00:00&end=2024-12-31T23:59:59",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "range"],
+              "query": [
+                {
+                  "key": "start",
+                  "value": "2024-01-01T00:00:00"
+                },
+                {
+                  "key": "end",
+                  "value": "2024-12-31T23:59:59"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Failed API Calls",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/failed",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "failed"]
+            }
+          }
+        },
+        {
+          "name": "Get Slow API Calls",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/slow?threshold=1000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "slow"],
+              "query": [
+                {
+                  "key": "threshold",
+                  "value": "1000",
+                  "description": "Threshold in milliseconds"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Statistics - All Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Get Statistics - Specific Service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/statistics/:serviceName",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "statistics", ":serviceName"],
+              "variable": [
+                {
+                  "key": "serviceName",
+                  "value": "OrderService"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Recent Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Count by Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/count/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "count", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Total Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "count"]
+            }
+          }
+        },
+        {
+          "name": "Cleanup Old Logs",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/logs/cleanup?days=30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logs", "cleanup"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30",
+                  "description": "Days to keep"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Market Data",
+      "item": [
+        {
+          "name": "Get Ticker (All Markets)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/ticker",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "ticker"]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Market Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/markets/details",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "markets", "details"]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Markets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/markets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "markets"]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Candlestick Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/candles?pair=BTCINR&interval=1m&limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "candles"],
+              "query": [
+                {
+                  "key": "pair",
+                  "value": "BTCINR",
+                  "description": "Trading pair"
+                },
+                {
+                  "key": "interval",
+                  "value": "1m",
+                  "description": "1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w"
+                },
+                {
+                  "key": "startTime",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endTime",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Orderbook",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/orderbook?pair=BTCINR",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "orderbook"],
+              "query": [
+                {
+                  "key": "pair",
+                  "value": "BTCINR"
+                }
+              ]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Trade History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/trade-history?pair=BTCINR&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "trade-history"],
+              "query": [
+                {
+                  "key": "pair",
+                  "value": "BTCINR"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "No authentication required"
+          }
+        },
+        {
+          "name": "Get Futures Depth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/public/futures/depth?instrument=BTCUSD_PERP&depth=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "public", "futures", "depth"],
+              "query": [
+                {
+                  "key": "instrument",
+                  "value": "BTCUSD_PERP"
+                },
+                {
+                  "key": "depth",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "No authentication required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"side\": \"buy\",\n  \"order_type\": \"limit_order\",\n  \"market\": \"BTCINR\",\n  \"price_per_unit\": \"5000000\",\n  \"total_quantity\": \"0.001\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "create"]
+            }
+          }
+        },
+        {
+          "name": "Create Multiple Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orders\": [\n    {\n      \"side\": \"buy\",\n      \"order_type\": \"limit_order\",\n      \"market\": \"BTCINR\",\n      \"price_per_unit\": \"5000000\",\n      \"total_quantity\": \"0.001\"\n    },\n    {\n      \"side\": \"sell\",\n      \"order_type\": \"limit_order\",\n      \"market\": \"ETHINR\",\n      \"price_per_unit\": \"200000\",\n      \"total_quantity\": \"0.01\"\n    }\n  ],\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/create-multiple",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "create-multiple"]
+            }
+          }
+        },
+        {
+          "name": "Edit Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"price_per_unit\": \"5100000\",\n  \"total_quantity\": \"0.002\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/edit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "edit"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Orders by IDs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"order_id_1\", \"order_id_2\"],\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cancel-by-ids",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cancel-by-ids"]
+            }
+          }
+        },
+        {
+          "name": "Cancel All Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"side\": \"buy\",\n  \"market\": \"BTCINR\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/cancel-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "cancel-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Multiple Order Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"order_id_1\", \"order_id_2\"],\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/status/multiple",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "status", "multiple"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"side\": \"buy\",\n  \"market\": \"BTCINR\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/active",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "active"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Orders Count",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"side\": \"buy\",\n  \"market\": \"BTCINR\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/active/count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "active", "count"]
+            }
+          }
+        },
+        {
+          "name": "Get Trade History",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_id\": 0,\n  \"limit\": 50,\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/trade-history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "trade-history"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Futures Trading",
+      "item": [
+        {
+          "name": "Get Active Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/futures/instruments/active?marginCurrencyShortName=USDT",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "instruments", "active"],
+              "query": [
+                {
+                  "key": "marginCurrencyShortName",
+                  "value": "USDT"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Futures Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"side\": \"buy\",\n  \"order_type\": \"limit_order\",\n  \"price\": \"50000\",\n  \"quantity\": \"0.1\",\n  \"leverage\": \"10\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/orders/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "orders", "create"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Futures Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/orders/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "orders", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Positions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions"]
+            }
+          }
+        },
+        {
+          "name": "Add Margin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"margin\": \"100\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/add-margin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "add-margin"]
+            }
+          }
+        },
+        {
+          "name": "Remove Margin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"margin\": \"50\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/remove-margin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "remove-margin"]
+            }
+          }
+        },
+        {
+          "name": "Update Leverage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"leverage\": \"15\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/update-leverage",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "update-leverage"]
+            }
+          }
+        },
+        {
+          "name": "Exit Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/exit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "exit"]
+            }
+          }
+        },
+        {
+          "name": "Create TP/SL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"take_profit\": {\n    \"trigger_price\": \"55000\"\n  },\n  \"stop_loss\": {\n    \"trigger_price\": \"45000\"\n  },\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/create-tpsl",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "create-tpsl"]
+            }
+          }
+        },
+        {
+          "name": "Cancel All Orders for Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/cancel-all-orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "cancel-all-orders"]
+            }
+          }
+        },
+        {
+          "name": "Cancel All Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/orders/cancel-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "orders", "cancel-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Position Transactions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/positions/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "positions", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Trades",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"instrument\": \"BTCUSD_PERP\",\n  \"limit\": 50,\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/futures/trades",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "trades"]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Depth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/futures/depth?instrument=BTCUSD_PERP&depth=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "futures", "depth"],
+              "query": [
+                {
+                  "key": "instrument",
+                  "value": "BTCUSD_PERP"
+                },
+                {
+                  "key": "depth",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Margin Trading",
+      "item": [
+        {
+          "name": "Create Margin Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"market\": \"BTCINR\",\n  \"side\": \"buy\",\n  \"order_type\": \"limit_order\",\n  \"price_per_unit\": \"5000000\",\n  \"total_quantity\": \"0.001\",\n  \"leverage\": \"3\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "create"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Margin Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Get Margin Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"market\": \"BTCINR\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Margin Order Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/order-status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "order-status"]
+            }
+          }
+        },
+        {
+          "name": "Add Margin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"margin\": \"1000\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/add-margin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "add-margin"]
+            }
+          }
+        },
+        {
+          "name": "Remove Margin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"margin\": \"500\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/remove-margin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "remove-margin"]
+            }
+          }
+        },
+        {
+          "name": "Edit Target Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"target_price\": \"5100000\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/edit-target-price",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "edit-target-price"]
+            }
+          }
+        },
+        {
+          "name": "Edit Stop Loss",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"stop_loss_price\": \"4900000\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/edit-sl",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "edit-sl"]
+            }
+          }
+        },
+        {
+          "name": "Edit Target",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"target\": \"5200000\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/edit-target",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "edit-target"]
+            }
+          }
+        },
+        {
+          "name": "Edit Trailing Stop Loss",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"trailing_sl_percent\": \"2\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/edit-trailing-sl",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "edit-trailing-sl"]
+            }
+          }
+        },
+        {
+          "name": "Exit Margin Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"order_id_here\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/margin/exit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "margin", "exit"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lending",
+      "item": [
+        {
+          "name": "Create Lending Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": \"USDT\",\n  \"amount\": \"1000\",\n  \"rate\": \"0.05\",\n  \"duration\": \"7\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lending/orders/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lending", "orders", "create"]
+            }
+          }
+        },
+        {
+          "name": "Fetch Lending Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"limit\": 50,\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/lending/orders/fetch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "lending", "orders", "fetch"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User & Wallet",
+      "item": [
+        {
+          "name": "Get User Balances",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/balances",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "balances"]
+            }
+          }
+        },
+        {
+          "name": "Get User Info",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/info",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "info"]
+            }
+          }
+        },
+        {
+          "name": "Transfer Between Wallets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"spot\",\n  \"to\": \"futures\",\n  \"currency\": \"USDT\",\n  \"amount\": \"1000\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/wallet/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallet", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Transfer to Sub-Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sub_account_id\": \"sub_account_id_here\",\n  \"currency\": \"USDT\",\n  \"amount\": \"500\",\n  \"timestamp\": {{$timestamp}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/wallet/sub-account/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallet", "sub-account", "transfer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - Spot Market Data",
+      "item": [
+        {
+          "name": "Get Latest Prices (All Pairs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-current-price/latest-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-current-price", "latest-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Current Price by Market",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-current-price/market/:market/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-current-price", "market", ":market", "latest"],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Price History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-current-price/market/:market?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-current-price", "market", ":market"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Markets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-current-price/markets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-current-price", "markets"]
+            }
+          }
+        },
+        {
+          "name": "Get Price Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-current-price/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-current-price", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Spot Depth Snapshot",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-depth-snapshot/market/:market/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-depth-snapshot", "market", ":market", "latest"],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Spot New Trades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-new-trade/market/:market/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-new-trade", "market", ":market", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Spot Candlestick Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-candlestick/market/:market/interval/:interval/recent?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-candlestick", "market", ":market", "interval", ":interval", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                },
+                {
+                  "key": "interval",
+                  "value": "1m"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Price Change (24h)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-price-change/market/:market/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-price-change", "market", ":market", "latest"],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Price Stats (24h)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-price-stats/market/:market/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-price-stats", "market", ":market", "latest"],
+              "variable": [
+                {
+                  "key": "market",
+                  "value": "BTCINR"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - Futures Market Data",
+      "item": [
+        {
+          "name": "Get Futures Current Prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-current-prices/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-current-prices", "latest"]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Instrument Prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-instrument-prices/instrument/:instrument/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-instrument-prices", "instrument", ":instrument", "latest"],
+              "variable": [
+                {
+                  "key": "instrument",
+                  "value": "BTCUSD_PERP"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-instrument-prices/instruments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-instrument-prices", "instruments"]
+            }
+          }
+        },
+        {
+          "name": "Get Latest Prices (All Instruments)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-instrument-prices/latest-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-instrument-prices", "latest-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Instrument Price History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-instrument-prices/instrument/:instrument?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-instrument-prices", "instrument", ":instrument"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "instrument",
+                  "value": "BTCUSD_PERP"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-instrument-prices/search?query=BTC",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-instrument-prices", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "BTC"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Orderbook",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-orderbook/contract/:contractSymbol/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-orderbook", "contract", ":contractSymbol", "latest"],
+              "variable": [
+                {
+                  "key": "contractSymbol",
+                  "value": "BTCUSD_PERP"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Futures New Trades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-new-trade/contract/:contractSymbol/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-new-trade", "contract", ":contractSymbol", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "contractSymbol",
+                  "value": "BTCUSD_PERP"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Candlestick Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-candlestick/contract/:contractSymbol/interval/:interval/recent?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-candlestick", "contract", ":contractSymbol", "interval", ":interval", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "contractSymbol",
+                  "value": "BTCUSD_PERP"
+                },
+                {
+                  "key": "interval",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - User Events",
+      "item": [
+        {
+          "name": "Get Spot Order Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-order-update/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-order-update", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Spot Trade Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-trade-update/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-trade-update", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Balance Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/balance-update/recent/50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "balance-update", "recent", "50"]
+            }
+          }
+        },
+        {
+          "name": "Get Balance by Currency",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/balance-update/currency/:currency/latest?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "balance-update", "currency", ":currency", "latest"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "currency",
+                  "value": "USDT"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Spot Balance Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/spot-balance/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "spot-balance", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Order Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-order-update/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-order-update", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Futures Position Updates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/futures-position-update/recent?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "futures-position-update", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - Subscriptions",
+      "item": [
+        {
+          "name": "Subscribe to Spot Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"market\": \"BTCINR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/websocket/subscriptions/spot/price",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "subscriptions", "spot", "price"]
+            }
+          }
+        },
+        {
+          "name": "Subscribe to Futures Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contractSymbol\": \"BTCUSD_PERP\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/websocket/subscriptions/futures/price",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "subscriptions", "futures", "price"]
+            }
+          }
+        },
+        {
+          "name": "Subscribe to User Events",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/subscriptions/user-events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "subscriptions", "user-events"]
+            },
+            "description": "Subscribes to order updates, trade updates, and balance updates"
+          }
+        },
+        {
+          "name": "Get Active Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/subscriptions/active",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "subscriptions", "active"]
+            }
+          }
+        },
+        {
+          "name": "Unsubscribe from Channel",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"BTC@coindcx\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/websocket/subscriptions/unsubscribe",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "subscriptions", "unsubscribe"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - Data Management",
+      "item": [
+        {
+          "name": "Get Storage Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/data/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "data", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Cleanup Old Data",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/data/cleanup?daysToKeep=7",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "data", "cleanup"],
+              "query": [
+                {
+                  "key": "daysToKeep",
+                  "value": "7"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Data Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/data/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "data", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get Latest Data (All Types)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/data/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "data", "latest"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket - Market Overview",
+      "item": [
+        {
+          "name": "Get Market Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/market/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "market", "overview"]
+            }
+          }
+        },
+        {
+          "name": "Get Top Gainers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/market/gainers?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "market", "gainers"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Top Losers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/market/losers?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "market", "losers"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Market Volume (24h)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/websocket/market/volume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "websocket", "market", "volume"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

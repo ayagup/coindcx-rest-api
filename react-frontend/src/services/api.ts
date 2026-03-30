@@ -3,13 +3,18 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
-// Create axios instance
+// Authenticated client — sends X-API-KEY / X-API-SECRET from localStorage (used by LoginPage flow)
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 60000,
+});
+
+// Public client — no auth headers; backend uses its own stored credentials
+export const publicApiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 60000,
 });
 
 // Request interceptor to add API keys
@@ -133,12 +138,50 @@ export const apiService = {
   clearWebSocketMessages: (event: string) => apiClient.delete('/api/websocket/messages/clear', { params: { event } }),
   clearAllWebSocketMessages: () => apiClient.delete('/api/websocket/messages/clear-all'),
 
+  // ── Futures trading actions via public client (backend auth handled server-side) ──
+  createFuturesOrderPublic: (orderData: any) => publicApiClient.post('/api/futures/orders/create', orderData),
+  cancelFuturesOrderPublic: (orderId: string) => publicApiClient.delete(`/api/futures/orders/cancel/${orderId}`),
+  closeFuturesPositionPublic: (data: any) => publicApiClient.post('/api/futures/positions/exit', data),
+  createTpSlPublic: (data: any) => publicApiClient.post('/api/futures/positions/create-tpsl', data),
+  cancelAllFuturesOrdersPublic: (data: any) => publicApiClient.post('/api/futures/positions/cancel-all-orders', data),
+
+  // ── WebSocket data endpoints (no credentials needed) ──
+  // Balance
+  getWsLatestAllBalances: () => publicApiClient.get('/api/websocket/balance-update/latest-all-currencies'),
+  getWsLatestBalance: (currency: string) => publicApiClient.get(`/api/websocket/balance-update/currency/${currency}/latest`),
+  getWsBalanceByCurrency: (currency: string) => publicApiClient.get(`/api/websocket/balance-update/by-currency`, { params: { currency } }),
+  // Returns a single WebSocketBalanceUpdateData object for the given currency (no auth)
+  getWsCurrentBalance: (currency: string) => publicApiClient.get(`/api/websocket/balance-update/currency/${currency}/current`),
+
+  // ── Trade Log / History ───────────────────────────────────────────────────
+  // Closed positions with realizedPnl, roi etc.
+  getWsClosedPositions: () => publicApiClient.get('/api/websocket/futures-position-update/status/closed'),
+  // Recent futures orders (includes takeProfitPrice, stopLossPrice, feeAmount)
+  getWsRecentOrders: (limit: number) => publicApiClient.get(`/api/websocket/futures-order-update/recent/${limit}`),
+  // Orders that have TP/SL set
+  getWsOrdersWithTpSl: () => publicApiClient.get('/api/websocket/futures-order-update/with-tpsl'),
+  // Aggregate PnL maps  { "USDT": <number> }
+  getWsTotalRealizedPnl: () => publicApiClient.get('/api/websocket/futures-position-update/total-realized-pnl'),
+  getWsTotalUnrealizedPnl: () => publicApiClient.get('/api/websocket/futures-position-update/total-unrealized-pnl'),
+  // Positions
+  getWsPositionSummary: () => publicApiClient.get('/api/websocket/futures-position-update/position-summary'),
+  getWsPositionsByPair: (pair: string) => publicApiClient.get(`/api/websocket/futures-position-update/pair/${pair}`),
+  getWsPositionsByStatus: (status: string) => publicApiClient.get(`/api/websocket/futures-position-update/status/${status}`),
+  getWsLatestPositionByPair: (pair: string) => publicApiClient.get(`/api/websocket/futures-position-update/pair/${pair}/latest`),
+  // Orders
+  getWsOrdersByStatus: (status: string) => publicApiClient.get(`/api/websocket/futures-order-update/status/${status}`),
+  getWsOrdersByPairAndStatus: (pair: string, status: string) => publicApiClient.get(`/api/websocket/futures-order-update/pair/${pair}/status/${status}`),
+  getWsOrdersByPair: (pair: string) => publicApiClient.get(`/api/websocket/futures-order-update/pair/${pair}`),
+
   // WebSocket Data Query APIs (No authentication required)
   getWebSocketDataStats: () => apiClient.get('/api/websocket/data/stats'),
-  getSpotMarketData: (marketPair: string, limit?: number) => 
-    apiClient.get(`/api/websocket/data/spot/${marketPair}`, { params: { limit } }),
-  getFuturesMarketData: (contractSymbol: string, limit?: number) => 
-    apiClient.get(`/api/websocket/data/futures/${contractSymbol}`, { params: { limit } }),
+  getSpotMarketData: (marketPair: string, limit?: number, timeframe?: string) => 
+    apiClient.get(`/api/websocket/data/spot/${marketPair}`, { params: { limit, timeframe } }),
+  getFuturesMarketData: (contractSymbol: string, limit?: number, timeframe?: string) => 
+    apiClient.get(`/api/websocket/data/futures/${contractSymbol}`, { params: { limit, timeframe } }),
+  // Public (no-auth) version — used by FuturesTradingPage to get markPrice
+  getFuturesMarketDataPublic: (contractSymbol: string, limit?: number, timeframe?: string) => 
+    publicApiClient.get(`/api/websocket/data/futures/${contractSymbol}`, { params: { limit, timeframe } }),
   getLatestSpotPrice: (marketPair: string) => 
     apiClient.get(`/api/websocket/data/spot/${marketPair}/latest-price`),
   getLatestFuturesPrice: (contractSymbol: string) => 

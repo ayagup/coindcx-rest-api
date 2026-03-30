@@ -125,9 +125,9 @@ public class ExchangeV1DerivativesFuturesOrdersCreatePostRequest {
    */
   @JsonAdapter(OrderTypeEnum.Adapter.class)
   public enum OrderTypeEnum {
-    MARKET("market"),
+    MARKET("market_order"),
     
-    LIMIT("limit"),
+    LIMIT("limit_order"),
     
     STOP_LIMIT("stop_limit"),
     
@@ -153,6 +153,9 @@ public class ExchangeV1DerivativesFuturesOrdersCreatePostRequest {
     }
 
     public static OrderTypeEnum fromValue(String value) {
+      // Accept shorthand aliases from frontend
+      if ("market".equals(value)) return MARKET;
+      if ("limit".equals(value)) return LIMIT;
       for (OrderTypeEnum b : OrderTypeEnum.values()) {
         if (b.value.equals(value)) {
           return b;

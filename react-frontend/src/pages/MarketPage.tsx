@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
-import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Zap } from 'lucide-react';
 
 type MarketType = 'spot' | 'futures';
 
@@ -17,7 +18,11 @@ interface MarketData {
   close?: string;
 }
 
+// Restricted futures symbols to monitor
+const ALLOWED_FUTURES = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-SPX_USDT'];
+
 const MarketPage: React.FC = () => {
+  const navigate = useNavigate();
   const [spotMarkets, setSpotMarkets] = useState<string[]>([]);
   const [futuresMarkets, setFuturesMarkets] = useState<string[]>([]);
   const [spotData, setSpotData] = useState<Map<string, MarketData>>(new Map());
@@ -30,16 +35,25 @@ const MarketPage: React.FC = () => {
   // Fetch list of all markets
   const fetchMarkets = async () => {
     try {
-      const [spotResponse, futuresResponse] = await Promise.all([
+      const [spotResponse] = await Promise.all([
         apiService.getAllSpotMarkets(),
         apiService.getAllFuturesContracts()
       ]);
       
       setSpotMarkets(spotResponse.data || []);
-      setFuturesMarkets(futuresResponse.data || []);
+      // Always set futures to our restricted list
+      setFuturesMarkets(ALLOWED_FUTURES);
+      
+      // If no spot markets are available, stop loading
+      if (!spotResponse.data || spotResponse.data.length === 0) {
+        setLoading(false);
+      }
     } catch (err: any) {
       console.error('Error fetching markets:', err);
       setError(err.response?.data?.message || 'Failed to fetch markets list');
+      // Still set futures markets even on error
+      setFuturesMarkets(ALLOWED_FUTURES);
+      setLoading(false);
     }
   };
 
@@ -126,7 +140,21 @@ const MarketPage: React.FC = () => {
     
     return markets
       .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
-      .map(market => dataMap.get(market))
+      .map(market => {
+        const data = dataMap.get(market);
+        // For futures, always return a market entry even if no data yet
+        if (!data && activeTab === 'futures') {
+          return {
+            market: market,
+            price: '0',
+            volume: undefined,
+            high: undefined,
+            low: undefined,
+            timestamp: undefined
+          };
+        }
+        return data;
+      })
       .filter(data => data !== undefined) as MarketData[];
   };
 
@@ -135,6 +163,15 @@ const MarketPage: React.FC = () => {
   const handleRefresh = () => {
     fetchMarkets();
     fetchMarketData();
+  };
+
+  const handleCardClick = (market: string) => {
+    navigate(`/chart/${activeTab}/${encodeURIComponent(market)}`);
+  };
+
+  const handleTradeClick = (e: React.MouseEvent, market: string) => {
+    e.stopPropagation();
+    navigate(`/futures?symbol=${encodeURIComponent(market)}`);
   };
 
   if (loading && spotData.size === 0 && futuresData.size === 0) return <Loading />;
@@ -185,27 +222,70 @@ const MarketPage: React.FC = () => {
         </div>
       )}
 
+      {!loading && spotData.size === 0 && futuresData.size === 0 && activeTab === 'spot' && (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>No market data available</p>
+          <p style={{ fontSize: '0.9rem' }}>
+            The WebSocket service hasn't collected any market data yet. 
+            Please make sure the WebSocket connection is active and collecting data.
+          </p>
+        </div>
+      )}
+
+      {filteredData.length === 0 && (spotData.size > 0 || futuresData.size > 0) && (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+          No markets found matching "{searchTerm}"
+        </div>
+      )}
+
       <div className="ticker-grid">
         {filteredData.map((data) => {
           const price = parseFloat(data.price);
+          const close = parseFloat(data.close || '0');
           const high = parseFloat(data.high || '0');
           const low = parseFloat(data.low || '0');
           const volume = parseFloat(data.volume || '0');
           const open = parseFloat(data.open || '0');
+          // Use close price if available (last updated price), otherwise use current price
+          const displayPrice = close > 0 ? close : price;
+          const hasData = displayPrice > 0 || high > 0 || volume > 0;
           
           return (
-            <div key={data.market} className="ticker-card">
+            <div 
+              key={data.market} 
+              className="ticker-card" 
+              style={{
+                ...(!hasData ? { opacity: 0.6 } : {}),
+                cursor: 'pointer',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onClick={() => handleCardClick(data.market)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '';
+              }}
+            >
               <div className="ticker-header">
                 <h3>{data.market}</h3>
-                {price > low ? (
+                {hasData && displayPrice > low ? (
                   <TrendingUp className="trend-up" size={20} />
-                ) : (
+                ) : hasData ? (
                   <TrendingDown className="trend-down" size={20} />
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Waiting for data...</span>
                 )}
               </div>
               
               <div className="ticker-price">
-                ₹{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+                {hasData ? (
+                  `₹${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                ) : (
+                  <span style={{ color: '#94a3b8' }}>--</span>
+                )}
               </div>
               
               <div className="ticker-details">
@@ -254,6 +334,26 @@ const MarketPage: React.FC = () => {
               }}>
                 📊 WebSocket Data
               </div>
+
+              {activeTab === 'futures' && (
+                <button
+                  onClick={(e) => handleTradeClick(e, data.market)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+                    marginTop: '0.6rem', width: '100%',
+                    padding: '0.45rem', border: 'none', borderRadius: '0.375rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: '#0f172a', fontWeight: 700, fontSize: '0.8rem',
+                    cursor: 'pointer', letterSpacing: '0.03em',
+                    transition: 'opacity 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                >
+                  <Zap size={13} />
+                  Trade Futures
+                </button>
+              )}
             </div>
           );
         })}

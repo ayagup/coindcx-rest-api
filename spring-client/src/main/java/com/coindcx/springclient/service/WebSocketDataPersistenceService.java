@@ -78,6 +78,7 @@ public class WebSocketDataPersistenceService {
     private final WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository;
     private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
     private final WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository;
+    private final FuturesInstrumentPriceParsingService instrumentPriceParsingService;
     private final Gson gson;
 
     public WebSocketDataPersistenceService(
@@ -99,7 +100,8 @@ public class WebSocketDataPersistenceService {
             WebSocketFuturesCandlestickDataRepository futuresCandlestickDataRepository,
             WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository,
             WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
-            WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository) {
+            WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository,
+            FuturesInstrumentPriceParsingService instrumentPriceParsingService) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
         this.spotBalanceDataRepository = spotBalanceDataRepository;
@@ -119,6 +121,7 @@ public class WebSocketDataPersistenceService {
         this.futuresOrderbookDataRepository = futuresOrderbookDataRepository;
         this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
         this.futuresNewTradeDataRepository = futuresNewTradeDataRepository;
+        this.instrumentPriceParsingService = instrumentPriceParsingService;
         this.gson = new Gson();
     }
 
@@ -264,78 +267,88 @@ public class WebSocketDataPersistenceService {
     // Helper methods for parsing specific event types
 
     private void parsePriceChange(WebSocketSpotData entity, JsonObject json) {
-        if (json.has("p")) entity.setPrice(new BigDecimal(json.get("p").getAsString()));
-        if (json.has("v")) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
-        if (json.has("h")) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
-        if (json.has("l")) entity.setLow(new BigDecimal(json.get("l").getAsString()));
-        if (json.has("o")) entity.setOpen(new BigDecimal(json.get("o").getAsString()));
-        if (json.has("c")) entity.setClose(new BigDecimal(json.get("c").getAsString()));
+        if (json.has("p") && !json.get("p").isJsonNull()) entity.setPrice(new BigDecimal(json.get("p").getAsString()));
+        if (json.has("v") && !json.get("v").isJsonNull()) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
+        if (json.has("h") && !json.get("h").isJsonNull()) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
+        if (json.has("l") && !json.get("l").isJsonNull()) entity.setLow(new BigDecimal(json.get("l").getAsString()));
+        if (json.has("o") && !json.get("o").isJsonNull()) entity.setOpen(new BigDecimal(json.get("o").getAsString()));
+        if (json.has("c") && !json.get("c").isJsonNull()) entity.setClose(new BigDecimal(json.get("c").getAsString()));
     }
 
     private void parseNewTrade(WebSocketSpotData entity, JsonObject json) {
-        if (json.has("t")) entity.setTradeId(json.get("t").getAsString());
-        if (json.has("p")) entity.setPrice(new BigDecimal(json.get("p").getAsString()));
-        if (json.has("q")) entity.setQuantity(new BigDecimal(json.get("q").getAsString()));
-        if (json.has("s")) entity.setSide(json.get("s").getAsString());
+        if (json.has("t") && !json.get("t").isJsonNull()) entity.setTradeId(json.get("t").getAsString());
+        if (json.has("p") && !json.get("p").isJsonNull()) entity.setPrice(new BigDecimal(json.get("p").getAsString()));
+        if (json.has("q") && !json.get("q").isJsonNull()) entity.setQuantity(new BigDecimal(json.get("q").getAsString()));
+        if (json.has("s") && !json.get("s").isJsonNull()) entity.setSide(json.get("s").getAsString());
     }
 
     private void parseDepthUpdate(WebSocketSpotData entity, JsonObject json) {
-        if (json.has("b") && json.get("b").isJsonArray() && json.getAsJsonArray("b").size() > 0) {
-            var bid = json.getAsJsonArray("b").get(0).getAsJsonArray();
-            entity.setBidPrice(new BigDecimal(bid.get(0).getAsString()));
-            entity.setBidQuantity(new BigDecimal(bid.get(1).getAsString()));
+        if (json.has("b") && !json.get("b").isJsonNull() && json.get("b").isJsonArray() && !json.getAsJsonArray("b").isEmpty()) {
+            var bidArray = json.getAsJsonArray("b").get(0);
+            if (bidArray != null && bidArray.isJsonArray()) {
+                var bid = bidArray.getAsJsonArray();
+                if (bid.size() >= 2 && !bid.get(0).isJsonNull() && !bid.get(1).isJsonNull()) {
+                    entity.setBidPrice(new BigDecimal(bid.get(0).getAsString()));
+                    entity.setBidQuantity(new BigDecimal(bid.get(1).getAsString()));
+                }
+            }
         }
-        if (json.has("a") && json.get("a").isJsonArray() && json.getAsJsonArray("a").size() > 0) {
-            var ask = json.getAsJsonArray("a").get(0).getAsJsonArray();
-            entity.setAskPrice(new BigDecimal(ask.get(0).getAsString()));
-            entity.setAskQuantity(new BigDecimal(ask.get(1).getAsString()));
+        if (json.has("a") && !json.get("a").isJsonNull() && json.get("a").isJsonArray() && !json.getAsJsonArray("a").isEmpty()) {
+            var askArray = json.getAsJsonArray("a").get(0);
+            if (askArray != null && askArray.isJsonArray()) {
+                var ask = askArray.getAsJsonArray();
+                if (ask.size() >= 2 && !ask.get(0).isJsonNull() && !ask.get(1).isJsonNull()) {
+                    entity.setAskPrice(new BigDecimal(ask.get(0).getAsString()));
+                    entity.setAskQuantity(new BigDecimal(ask.get(1).getAsString()));
+                }
+            }
         }
     }
 
     private void parseCandlestick(WebSocketSpotData entity, JsonObject json) {
-        if (json.has("o")) entity.setOpen(new BigDecimal(json.get("o").getAsString()));
-        if (json.has("h")) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
-        if (json.has("l")) entity.setLow(new BigDecimal(json.get("l").getAsString()));
-        if (json.has("c")) entity.setClose(new BigDecimal(json.get("c").getAsString()));
-        if (json.has("v")) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
+        if (json.has("o") && !json.get("o").isJsonNull()) entity.setOpen(new BigDecimal(json.get("o").getAsString()));
+        if (json.has("h") && !json.get("h").isJsonNull()) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
+        if (json.has("l") && !json.get("l").isJsonNull()) entity.setLow(new BigDecimal(json.get("l").getAsString()));
+        if (json.has("c") && !json.get("c").isJsonNull()) entity.setClose(new BigDecimal(json.get("c").getAsString()));
+        if (json.has("v") && !json.get("v").isJsonNull()) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
     }
 
     private void parseFuturesPriceChange(WebSocketFuturesData entity, JsonObject json) {
-        if (json.has("p")) entity.setLastPrice(new BigDecimal(json.get("p").getAsString()));
-        if (json.has("m")) entity.setMarkPrice(new BigDecimal(json.get("m").getAsString()));
-        if (json.has("i")) entity.setIndexPrice(new BigDecimal(json.get("i").getAsString()));
-        if (json.has("v")) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
-        if (json.has("h")) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
-        if (json.has("l")) entity.setLow(new BigDecimal(json.get("l").getAsString()));
+        if (json.has("p") && !json.get("p").isJsonNull()) entity.setLastPrice(new BigDecimal(json.get("p").getAsString()));
+        if (json.has("m") && !json.get("m").isJsonNull()) entity.setMarkPrice(new BigDecimal(json.get("m").getAsString()));
+        if (json.has("i") && !json.get("i").isJsonNull()) entity.setIndexPrice(new BigDecimal(json.get("i").getAsString()));
+        if (json.has("v") && !json.get("v").isJsonNull()) entity.setVolume(new BigDecimal(json.get("v").getAsString()));
+        if (json.has("h") && !json.get("h").isJsonNull()) entity.setHigh(new BigDecimal(json.get("h").getAsString()));
+        if (json.has("l") && !json.get("l").isJsonNull()) entity.setLow(new BigDecimal(json.get("l").getAsString()));
     }
 
     private void parsePositionUpdate(WebSocketFuturesData entity, JsonObject json) {
-        if (json.has("size")) entity.setPositionSize(new BigDecimal(json.get("size").getAsString()));
-        if (json.has("leverage")) entity.setLeverage(new BigDecimal(json.get("leverage").getAsString()));
-        if (json.has("upnl")) entity.setUnrealizedPnl(new BigDecimal(json.get("upnl").getAsString()));
-        if (json.has("liquidationPrice")) entity.setLiquidationPrice(new BigDecimal(json.get("liquidationPrice").getAsString()));
-        if (json.has("side")) entity.setSide(json.get("side").getAsString());
+        if (json.has("size") && !json.get("size").isJsonNull()) entity.setPositionSize(new BigDecimal(json.get("size").getAsString()));
+        if (json.has("leverage") && !json.get("leverage").isJsonNull()) entity.setLeverage(new BigDecimal(json.get("leverage").getAsString()));
+        if (json.has("upnl") && !json.get("upnl").isJsonNull()) entity.setUnrealizedPnl(new BigDecimal(json.get("upnl").getAsString()));
+        if (json.has("liquidationPrice") && !json.get("liquidationPrice").isJsonNull()) entity.setLiquidationPrice(new BigDecimal(json.get("liquidationPrice").getAsString()));
+        if (json.has("side") && !json.get("side").isJsonNull()) entity.setSide(json.get("side").getAsString());
     }
 
     private void parseOrderUpdate(WebSocketFuturesData entity, JsonObject json) {
-        if (json.has("price")) entity.setLastPrice(new BigDecimal(json.get("price").getAsString()));
-        if (json.has("quantity")) entity.setQuantity(new BigDecimal(json.get("quantity").getAsString()));
-        if (json.has("side")) entity.setSide(json.get("side").getAsString());
+        if (json.has("price") && !json.get("price").isJsonNull()) entity.setLastPrice(new BigDecimal(json.get("price").getAsString()));
+        if (json.has("quantity") && !json.get("quantity").isJsonNull()) entity.setQuantity(new BigDecimal(json.get("quantity").getAsString()));
+        if (json.has("side") && !json.get("side").isJsonNull()) entity.setSide(json.get("side").getAsString());
     }
 
     private void parseFundingRateUpdate(WebSocketFuturesData entity, JsonObject json) {
-        if (json.has("fundingRate")) entity.setFundingRate(new BigDecimal(json.get("fundingRate").getAsString()));
-        if (json.has("nextFundingTime")) {
+        if (json.has("fundingRate") && !json.get("fundingRate").isJsonNull()) entity.setFundingRate(new BigDecimal(json.get("fundingRate").getAsString()));
+        if (json.has("nextFundingTime") && !json.get("nextFundingTime").isJsonNull()) {
             long timestamp = json.get("nextFundingTime").getAsLong();
             entity.setNextFundingTime(LocalDateTime.ofEpochSecond(timestamp / 1000, 0, java.time.ZoneOffset.UTC));
         }
     }
 
     private void parseFuturesTrade(WebSocketFuturesData entity, JsonObject json) {
-        if (json.has("t")) entity.setTradeId(json.get("t").getAsString());
-        if (json.has("p")) entity.setLastPrice(new BigDecimal(json.get("p").getAsString()));
-        if (json.has("q")) entity.setQuantity(new BigDecimal(json.get("q").getAsString()));
-        if (json.has("s")) entity.setSide(json.get("s").getAsString());
+        if (json.has("t") && !json.get("t").isJsonNull()) entity.setTradeId(json.get("t").getAsString());
+        if (json.has("p") && !json.get("p").isJsonNull()) entity.setLastPrice(new BigDecimal(json.get("p").getAsString()));
+        if (json.has("q") && !json.get("q").isJsonNull()) entity.setQuantity(new BigDecimal(json.get("q").getAsString()));
+        if (json.has("s") && !json.get("s").isJsonNull()) entity.setSide(json.get("s").getAsString());
     }
 
     /**
@@ -348,8 +361,8 @@ public class WebSocketDataPersistenceService {
             WebSocketSpotBalanceData spotBalanceData = new WebSocketSpotBalanceData();
             spotBalanceData.setTimestamp(LocalDateTime.now());
 
-            // Convert data to JSON string
-            String jsonData = gson.toJson(data);
+            // Convert data to JSON string - handle if it's already a string
+            String jsonData = (data instanceof String) ? (String) data : gson.toJson(data);
             spotBalanceData.setRawData(jsonData);
 
             // Parse and extract spot balance fields
@@ -371,32 +384,32 @@ public class WebSocketDataPersistenceService {
             JsonObject json = JsonParser.parseString(jsonData).getAsJsonObject();
 
             // Extract common balance fields
-            if (json.has("currency")) {
+            if (json.has("currency") && !json.get("currency").isJsonNull()) {
                 entity.setCurrency(json.get("currency").getAsString());
-            } else if (json.has("c")) {
+            } else if (json.has("c") && !json.get("c").isJsonNull()) {
                 entity.setCurrency(json.get("c").getAsString());
             }
 
-            if (json.has("balance")) {
+            if (json.has("balance") && !json.get("balance").isJsonNull()) {
                 entity.setBalance(json.get("balance").getAsString());
-            } else if (json.has("b")) {
+            } else if (json.has("b") && !json.get("b").isJsonNull()) {
                 entity.setBalance(json.get("b").getAsString());
             }
 
-            if (json.has("locked_balance")) {
+            if (json.has("locked_balance") && !json.get("locked_balance").isJsonNull()) {
                 entity.setLockedBalance(json.get("locked_balance").getAsString());
-            } else if (json.has("l")) {
+            } else if (json.has("l") && !json.get("l").isJsonNull()) {
                 entity.setLockedBalance(json.get("l").getAsString());
             }
 
-            if (json.has("available_balance")) {
+            if (json.has("available_balance") && !json.get("available_balance").isJsonNull()) {
                 entity.setAvailableBalance(json.get("available_balance").getAsString());
-            } else if (json.has("a")) {
+            } else if (json.has("a") && !json.get("a").isJsonNull()) {
                 entity.setAvailableBalance(json.get("a").getAsString());
             }
 
             // Calculate total balance if not provided
-            if (json.has("total_balance")) {
+            if (json.has("total_balance") && !json.get("total_balance").isJsonNull()) {
                 entity.setTotalBalance(json.get("total_balance").getAsString());
             } else if (entity.getBalance() != null && entity.getLockedBalance() != null) {
                 try {
@@ -409,16 +422,16 @@ public class WebSocketDataPersistenceService {
             }
 
             // Extract user ID if available
-            if (json.has("user_id")) {
+            if (json.has("user_id") && !json.get("user_id").isJsonNull()) {
                 entity.setUserId(json.get("user_id").getAsString());
-            } else if (json.has("u")) {
+            } else if (json.has("u") && !json.get("u").isJsonNull()) {
                 entity.setUserId(json.get("u").getAsString());
             }
 
             // Extract timestamp if available
-            if (json.has("timestamp")) {
+            if (json.has("timestamp") && !json.get("timestamp").isJsonNull()) {
                 entity.setExchangeTimestamp(json.get("timestamp").getAsLong());
-            } else if (json.has("t")) {
+            } else if (json.has("t") && !json.get("t").isJsonNull()) {
                 entity.setExchangeTimestamp(json.get("t").getAsLong());
             }
 
@@ -437,8 +450,8 @@ public class WebSocketDataPersistenceService {
             WebSocketSpotOrderUpdateData orderUpdateData = new WebSocketSpotOrderUpdateData();
             orderUpdateData.setTimestamp(LocalDateTime.now());
 
-            // Convert data to JSON string
-            String jsonData = gson.toJson(data);
+            // Convert data to JSON string - handle if it's already a string
+            String jsonData = (data instanceof String) ? (String) data : gson.toJson(data);
             orderUpdateData.setRawData(jsonData);
 
             // Parse and extract order update fields
@@ -461,87 +474,87 @@ public class WebSocketDataPersistenceService {
             JsonObject json = JsonParser.parseString(jsonData).getAsJsonObject();
 
             // Extract order ID (required)
-            if (json.has("id")) {
+            if (json.has("id") && !json.get("id").isJsonNull()) {
                 entity.setOrderId(json.get("id").getAsString());
             }
 
             // Extract client order ID
-            if (json.has("client_order_id")) {
+            if (json.has("client_order_id") && !json.get("client_order_id").isJsonNull()) {
                 entity.setClientOrderId(json.get("client_order_id").getAsString());
             }
 
             // Extract order type
-            if (json.has("order_type")) {
+            if (json.has("order_type") && !json.get("order_type").isJsonNull()) {
                 entity.setOrderType(json.get("order_type").getAsString());
             }
 
             // Extract side (buy/sell)
-            if (json.has("side")) {
+            if (json.has("side") && !json.get("side").isJsonNull()) {
                 entity.setSide(json.get("side").getAsString());
             }
 
             // Extract status
-            if (json.has("status")) {
+            if (json.has("status") && !json.get("status").isJsonNull()) {
                 entity.setStatus(json.get("status").getAsString());
             }
 
             // Extract fee amount
-            if (json.has("fee_amount")) {
+            if (json.has("fee_amount") && !json.get("fee_amount").isJsonNull()) {
                 entity.setFeeAmount(json.get("fee_amount").getAsString());
             }
 
             // Extract maker fee
-            if (json.has("maker_fee")) {
+            if (json.has("maker_fee") && !json.get("maker_fee").isJsonNull()) {
                 entity.setMakerFee(json.get("maker_fee").getAsString());
             }
 
             // Extract taker fee
-            if (json.has("taker_fee")) {
+            if (json.has("taker_fee") && !json.get("taker_fee").isJsonNull()) {
                 entity.setTakerFee(json.get("taker_fee").getAsString());
             }
 
             // Extract total quantity
-            if (json.has("total_quantity")) {
+            if (json.has("total_quantity") && !json.get("total_quantity").isJsonNull()) {
                 entity.setTotalQuantity(json.get("total_quantity").getAsString());
             }
 
             // Extract remaining quantity
-            if (json.has("remaining_quantity")) {
+            if (json.has("remaining_quantity") && !json.get("remaining_quantity").isJsonNull()) {
                 entity.setRemainingQuantity(json.get("remaining_quantity").getAsString());
             }
 
             // Extract average price
-            if (json.has("avg_price")) {
+            if (json.has("avg_price") && !json.get("avg_price").isJsonNull()) {
                 entity.setAvgPrice(json.get("avg_price").getAsString());
             }
 
             // Extract price per unit
-            if (json.has("price_per_unit")) {
+            if (json.has("price_per_unit") && !json.get("price_per_unit").isJsonNull()) {
                 entity.setPricePerUnit(json.get("price_per_unit").getAsString());
             }
 
             // Extract stop price
-            if (json.has("stop_price")) {
+            if (json.has("stop_price") && !json.get("stop_price").isJsonNull()) {
                 entity.setStopPrice(json.get("stop_price").getAsString());
             }
 
             // Extract market
-            if (json.has("market")) {
+            if (json.has("market") && !json.get("market").isJsonNull()) {
                 entity.setMarket(json.get("market").getAsString());
             }
 
             // Extract time in force
-            if (json.has("time_in_force")) {
+            if (json.has("time_in_force") && !json.get("time_in_force").isJsonNull()) {
                 entity.setTimeInForce(json.get("time_in_force").getAsString());
             }
 
             // Extract created_at timestamp
-            if (json.has("created_at")) {
+            if (json.has("created_at") && !json.get("created_at").isJsonNull()) {
                 entity.setCreatedAt(json.get("created_at").getAsLong());
             }
 
             // Extract updated_at timestamp
-            if (json.has("updated_at")) {
+            if (json.has("updated_at") && !json.get("updated_at").isJsonNull()) {
                 entity.setUpdatedAt(json.get("updated_at").getAsLong());
             }
 
@@ -560,8 +573,8 @@ public class WebSocketDataPersistenceService {
             WebSocketSpotTradeUpdateData tradeUpdateData = new WebSocketSpotTradeUpdateData();
             tradeUpdateData.setTimestamp(LocalDateTime.now());
 
-            // Convert data to JSON string
-            String jsonData = gson.toJson(data);
+            // Convert data to JSON string - handle if it's already a string
+            String jsonData = (data instanceof String) ? (String) data : gson.toJson(data);
             tradeUpdateData.setRawData(jsonData);
 
             // Parse and extract trade update fields
@@ -651,8 +664,9 @@ public class WebSocketDataPersistenceService {
     @Transactional
     public void saveSpotCandlestickData(Object data) {
         try {
-            String jsonData = gson.toJson(data);
-            
+            // Convert data to JSON string - handle if it's already a string
+            String jsonData = (data instanceof String) ? (String) data : gson.toJson(data);
+
             WebSocketSpotCandlestickData candlestick = new WebSocketSpotCandlestickData();
             candlestick.setRawData(jsonData);
             
@@ -1607,31 +1621,71 @@ public class WebSocketDataPersistenceService {
     }
 
     /**
-     * Save balance update data (handles array response)
+     * Save balance update data — handles both JSON array and single-object payloads.
      */
     @Async
     @Transactional
     public void saveBalanceUpdateData(Object data, String channelName) {
         try {
-            String jsonString = gson.toJson(data);
+            String jsonString = (data instanceof String) ? (String) data : gson.toJson(data);
             logger.debug("Received balance update data: {}", jsonString);
 
-            // Parse as JSON array
-            com.google.gson.JsonArray jsonArray = JsonParser.parseString(jsonString).getAsJsonArray();
-            
-            // Process each balance update in the array
+            com.google.gson.JsonElement parsed = JsonParser.parseString(jsonString);
+
+            com.google.gson.JsonArray jsonArray;
+            if (parsed.isJsonArray()) {
+                jsonArray = parsed.getAsJsonArray();
+            } else if (parsed.isJsonObject()) {
+                // Single-object payload — wrap in array
+                jsonArray = new com.google.gson.JsonArray();
+                jsonArray.add(parsed.getAsJsonObject());
+            } else {
+                logger.warn("Unexpected balance update format: {}", jsonString);
+                return;
+            }
+
+            int saved = 0;
             for (int i = 0; i < jsonArray.size(); i++) {
                 JsonObject balanceJson = jsonArray.get(i).getAsJsonObject();
+                // Tolerate both full field names and short aliases
+                normalizeBalanceUpdateFields(balanceJson);
                 WebSocketBalanceUpdateData entity = parseBalanceUpdateData(balanceJson, channelName, jsonString);
                 if (entity != null) {
                     balanceUpdateDataRepository.save(entity);
-                    logger.debug("Saved balance update data for currency: {}", entity.getCurrencyShortName());
+                    logger.debug("Saved balance update for currency: {}", entity.getCurrencyShortName());
+                    saved++;
                 }
             }
-            
-            logger.info("Saved {} balance update records", jsonArray.size());
+
+            logger.info("Saved {} balance update record(s) for channel {}", saved, channelName);
         } catch (Exception e) {
             logger.error("Error saving balance update data", e);
+        }
+    }
+
+    /**
+     * Normalise short field aliases (c/b/l) to full names expected by parseBalanceUpdateData.
+     */
+    private void normalizeBalanceUpdateFields(JsonObject json) {
+        // currency_short_name
+        if (!json.has("currency_short_name") && json.has("c")) {
+            json.addProperty("currency_short_name", json.get("c").getAsString());
+        }
+        // balance
+        if (!json.has("balance") && json.has("b")) {
+            json.add("balance", json.get("b"));
+        }
+        // locked_balance
+        if (!json.has("locked_balance") && json.has("l")) {
+            json.add("locked_balance", json.get("l"));
+        }
+        // currency_id — try aliased key "ci" if present
+        if (!json.has("currency_id") && json.has("ci")) {
+            json.add("currency_id", json.get("ci"));
+        }
+        // id / balanceId — alias "i"
+        if (!json.has("id") && json.has("i")) {
+            json.add("id", json.get("i"));
         }
     }
 
@@ -1691,7 +1745,8 @@ public class WebSocketDataPersistenceService {
     @Transactional
     public void saveFuturesCandlestickData(Object data, String channelName) {
         try {
-            String jsonString = gson.toJson(data);
+            // Handle data - it may already be a JSON string
+            String jsonString = (data instanceof String) ? (String) data : gson.toJson(data);
             logger.debug("Received futures candlestick data: {}", jsonString);
 
             JsonObject outerJson = JsonParser.parseString(jsonString).getAsJsonObject();
@@ -1710,7 +1765,7 @@ public class WebSocketDataPersistenceService {
 
             // Extract metadata from root level
             Long ets = rootJson.has("Ets") && !rootJson.get("Ets").isJsonNull() ? rootJson.get("Ets").getAsLong() : null;
-            String interval = rootJson.has("i") && !rootJson.get("i").isJsonNull() ? rootJson.get("i").getAsString() : null;
+            String interval = rootJson.has("i") && !rootJson.get("i").isJsonNull() ? normalizeDuration(rootJson.get("i").getAsString()) : null;
             String channel = rootJson.has("channel") && !rootJson.get("channel").isJsonNull() ? rootJson.get("channel").getAsString() : channelName;
             String product = rootJson.has("pr") && !rootJson.get("pr").isJsonNull() ? rootJson.get("pr").getAsString() : "futures";
             
@@ -1794,12 +1849,16 @@ public class WebSocketDataPersistenceService {
             }
 
             // Extract timestamps
+            // WebSocket sends open_time in SECONDS (10 digits); Python-loaded history uses MILLISECONDS (13 digits).
+            // Normalise to milliseconds so all rows in the table are consistent.
             if (json.has("open_time") && !json.get("open_time").isJsonNull()) {
-                entity.setOpenTime(json.get("open_time").getAsLong());
+                long openTimeRaw = json.get("open_time").getAsLong();
+                entity.setOpenTime(openTimeRaw < 9_999_999_999L ? openTimeRaw * 1000L : openTimeRaw);
             }
 
             if (json.has("close_time") && !json.get("close_time").isJsonNull()) {
-                entity.setCloseTime(json.get("close_time").getAsDouble());
+                double closeTimeRaw = json.get("close_time").getAsDouble();
+                entity.setCloseTime(closeTimeRaw < 9_999_999_999.0 ? closeTimeRaw * 1000.0 : closeTimeRaw);
             }
 
             // Extract pair, duration, and symbol
@@ -1808,7 +1867,7 @@ public class WebSocketDataPersistenceService {
             }
 
             if (json.has("duration") && !json.get("duration").isJsonNull()) {
-                entity.setDuration(json.get("duration").getAsString());
+                entity.setDuration(normalizeDuration(json.get("duration").getAsString()));
             }
 
             if (json.has("symbol") && !json.get("symbol").isJsonNull()) {
@@ -1823,13 +1882,90 @@ public class WebSocketDataPersistenceService {
     }
 
     /**
+     * Normalize WebSocket duration/interval strings to match the REST API / Python-loaded format.
+     * WebSocket sends: "1m", "5m", "1h", "1d"  →  DB expects: "1", "5", "60", "1D"
+     */
+    private String normalizeDuration(String raw) {
+        if (raw == null) return null;
+        switch (raw) {
+            case "1m":  return "1";
+            case "3m":  return "3";
+            case "5m":  return "5";
+            case "15m": return "15";
+            case "30m": return "30";
+            case "1h":  return "60";
+            case "2h":  return "120";
+            case "4h":  return "240";
+            case "1d":  return "1D";
+            case "1w":  return "1W";
+            default:    return raw; // already normalised (e.g. "1", "60", "1D") or unknown
+        }
+    }
+
+    /**
+     * Save a Yahoo Finance DXY kline (candlestick) into websocket_futures_candlestick_data.
+     * Called for every completed candle polled from the Yahoo Finance chart REST API.
+     *
+     * @param kline      the kline object built by {@link YahooFinanceDxyService}
+     * @param streamName the stream identifier, e.g. "dxyusd@kline_1m"
+     */
+    @Async
+    @Transactional
+    public void saveYahooFinanceCandlestickData(JsonObject kline, String streamName) {
+        try {
+            WebSocketFuturesCandlestickData entity = new WebSocketFuturesCandlestickData();
+            entity.setChannelName(streamName);
+            entity.setProduct("futures");
+            entity.setRawData(kline.toString());
+
+            // Interval / duration — Yahoo Finance sends "1m", "5m", "1h", "1d" → normalise to "1", "5", "60", "1D"
+            String rawInterval = kline.has("i") ? kline.get("i").getAsString() : null;
+            String normalizedDuration = normalizeDuration(rawInterval);
+            entity.setInterval(normalizedDuration != null ? normalizedDuration : rawInterval);
+            entity.setDuration(normalizedDuration != null ? normalizedDuration : rawInterval);
+
+            // Symbol — e.g. "DXYUSD"; use as both pair and symbol
+            String symbol = kline.has("s") ? kline.get("s").getAsString() : "DXYUSD";
+            entity.setPair(symbol);
+            entity.setSymbol(symbol);
+
+            // Timestamps — already provided in milliseconds
+            if (kline.has("t") && !kline.get("t").isJsonNull()) {
+                entity.setOpenTime(kline.get("t").getAsLong());
+            }
+            if (kline.has("T") && !kline.get("T").isJsonNull()) {
+                entity.setCloseTime(kline.get("T").getAsDouble());
+            }
+
+            // Event timestamp proxy
+            entity.setEts(entity.getOpenTime() != null ? entity.getOpenTime() : System.currentTimeMillis());
+
+            // OHLCV
+            entity.setOpen(kline.has("o")  ? new BigDecimal(kline.get("o").getAsString()) : BigDecimal.ZERO);
+            entity.setClose(kline.has("c") ? new BigDecimal(kline.get("c").getAsString()) : BigDecimal.ZERO);
+            entity.setHigh(kline.has("h")  ? new BigDecimal(kline.get("h").getAsString()) : BigDecimal.ZERO);
+            entity.setLow(kline.has("l")   ? new BigDecimal(kline.get("l").getAsString()) : BigDecimal.ZERO);
+            entity.setVolume(kline.has("v")      ? new BigDecimal(kline.get("v").getAsString()) : BigDecimal.ZERO);
+            entity.setQuoteVolume(kline.has("q") ? new BigDecimal(kline.get("q").getAsString()) : BigDecimal.ZERO);
+
+            futuresCandlestickDataRepository.save(entity);
+            logger.debug("Saved Yahoo Finance candlestick: stream={} duration={} openTime={} closed={}",
+                    streamName, normalizedDuration, entity.getOpenTime(),
+                    kline.has("x") && kline.get("x").getAsBoolean());
+        } catch (Exception e) {
+            logger.error("Error saving Yahoo Finance candlestick data from stream {}: {}", streamName, e.getMessage());
+        }
+    }
+
+    /**
      * Save futures orderbook data
      * Handles depth-snapshot event
      */
     @Async
     public void saveFuturesOrderbookData(Object data) {
         try {
-            String jsonString = gson.toJson(data);
+            // Handle data - it may already be a JSON string
+            String jsonString = (data instanceof String) ? (String) data : gson.toJson(data);
             WebSocketFuturesOrderbookData orderbookData = parseFuturesOrderbookData(jsonString);
             if (orderbookData != null) {
                 futuresOrderbookDataRepository.save(orderbookData);
@@ -1934,11 +2070,16 @@ public class WebSocketDataPersistenceService {
     @Async
     public void saveFuturesCurrentPricesData(Object data) {
         try {
-            String jsonString = gson.toJson(data);
+            // Handle data - it may already be a JSON string
+            String jsonString = (data instanceof String) ? (String) data : gson.toJson(data);
             WebSocketFuturesCurrentPricesData pricesData = parseFuturesCurrentPricesData(jsonString);
             if (pricesData != null) {
-                futuresCurrentPricesDataRepository.save(pricesData);
-                logger.debug("Saved futures current prices data");
+                // Save the parent record
+                WebSocketFuturesCurrentPricesData savedData = futuresCurrentPricesDataRepository.save(pricesData);
+                logger.debug("Saved futures current prices data with timestamp {}", savedData.getTimestamp());
+                
+                // Parse and save individual instrument prices asynchronously
+                instrumentPriceParsingService.parseAndSaveInstrumentPrices(savedData);
             }
         } catch (Exception e) {
             logger.error("Error saving futures current prices data", e);
@@ -2030,7 +2171,8 @@ public class WebSocketDataPersistenceService {
         try {
             logger.debug("Received futures new trade data from channel: {}, data type: {}", channelName, data.getClass().getSimpleName());
 
-            String jsonString = gson.toJson(data);
+            // Handle data - it may already be a JSON string
+            String jsonString = (data instanceof String) ? (String) data : gson.toJson(data);
             logger.debug("Converted to JSON string (first 300 chars): {}",
                 jsonString.length() > 300 ? jsonString.substring(0, 300) + "..." : jsonString);
 

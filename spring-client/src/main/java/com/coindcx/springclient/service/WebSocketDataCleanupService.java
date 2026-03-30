@@ -17,6 +17,7 @@ import com.coindcx.springclient.repository.WebSocketFuturesCandlestickDataReposi
 import com.coindcx.springclient.repository.WebSocketFuturesOrderbookDataRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesCurrentPricesDataRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesNewTradeDataRepository;
+import com.coindcx.springclient.repository.WebSocketFuturesInstrumentPriceRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesDataRepository;
 import com.coindcx.springclient.repository.WebSocketSpotDataRepository;
 import org.slf4j.Logger;
@@ -55,6 +56,7 @@ public class WebSocketDataCleanupService {
     private final WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository;
     private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
     private final WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository;
+    private final WebSocketFuturesInstrumentPriceRepository futuresInstrumentPriceRepository;
 
     @Value("${websocket.data.retention.days:7}")
     private int retentionDays;
@@ -78,7 +80,8 @@ public class WebSocketDataCleanupService {
             WebSocketFuturesCandlestickDataRepository futuresCandlestickDataRepository,
             WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository,
             WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
-            WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository) {
+            WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository,
+            WebSocketFuturesInstrumentPriceRepository futuresInstrumentPriceRepository) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
         this.spotBalanceDataRepository = spotBalanceDataRepository;
@@ -98,6 +101,7 @@ public class WebSocketDataCleanupService {
         this.futuresOrderbookDataRepository = futuresOrderbookDataRepository;
         this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
         this.futuresNewTradeDataRepository = futuresNewTradeDataRepository;
+        this.futuresInstrumentPriceRepository = futuresInstrumentPriceRepository;
     }
 
     /**
@@ -131,6 +135,7 @@ public class WebSocketDataCleanupService {
             long futuresOrderbookCountBefore = futuresOrderbookDataRepository.count();
             long futuresCurrentPricesCountBefore = futuresCurrentPricesDataRepository.count();
             long futuresNewTradeCountBefore = futuresNewTradeDataRepository.count();
+            long futuresInstrumentPriceCountBefore = futuresInstrumentPriceRepository.count();
             
             // Delete old spot data
             spotDataRepository.deleteByTimestampBefore(cutoff);
@@ -189,6 +194,9 @@ public class WebSocketDataCleanupService {
             // Delete old futures new trade data
             futuresNewTradeDataRepository.deleteByRecordTimestampBefore(cutoff);
             
+            // Delete old futures instrument price data
+            futuresInstrumentPriceRepository.deleteOldRecords(cutoff);
+            
             long spotCountAfter = spotDataRepository.count();
             long futuresCountAfter = futuresDataRepository.count();
             long spotBalanceCountAfter = spotBalanceDataRepository.count();
@@ -208,6 +216,7 @@ public class WebSocketDataCleanupService {
             long futuresOrderbookCountAfter = futuresOrderbookDataRepository.count();
             long futuresCurrentPricesCountAfter = futuresCurrentPricesDataRepository.count();
             long futuresNewTradeCountAfter = futuresNewTradeDataRepository.count();
+            long futuresInstrumentPriceCountAfter = futuresInstrumentPriceRepository.count();
             
             long spotDeleted = spotCountBefore - spotCountAfter;
             long futuresDeleted = futuresCountBefore - futuresCountAfter;
@@ -228,6 +237,7 @@ public class WebSocketDataCleanupService {
             long futuresOrderbookDeleted = futuresOrderbookCountBefore - futuresOrderbookCountAfter;
             long futuresCurrentPricesDeleted = futuresCurrentPricesCountBefore - futuresCurrentPricesCountAfter;
             long futuresNewTradeDeleted = futuresNewTradeCountBefore - futuresNewTradeCountAfter;
+            long futuresInstrumentPriceDeleted = futuresInstrumentPriceCountBefore - futuresInstrumentPriceCountAfter;
             
             logger.info("WebSocket data cleanup completed:");
             logger.info("  Spot records deleted: {}", spotDeleted);
@@ -249,9 +259,10 @@ public class WebSocketDataCleanupService {
             logger.info("  Futures Orderbook records deleted: {}", futuresOrderbookDeleted);
             logger.info("  Futures Current Prices records deleted: {}", futuresCurrentPricesDeleted);
             logger.info("  Futures New Trade records deleted: {}", futuresNewTradeDeleted);
-            logger.info("  Total deleted: {}", spotDeleted + futuresDeleted + spotBalanceDeleted + spotOrderUpdateDeleted + spotTradeUpdateDeleted + spotCandlestickDeleted + spotDepthSnapshotDeleted + spotDepthUpdateDeleted + spotCurrentPriceDeleted + spotPriceStatsDeleted + spotNewTradeDeleted + spotPriceChangeDeleted + futuresPositionUpdateDeleted + futuresOrderUpdateDeleted + balanceUpdateDeleted + futuresCandlestickDeleted + futuresOrderbookDeleted + futuresCurrentPricesDeleted + futuresNewTradeDeleted);
-            logger.info("  Remaining - Spot: {}, Futures: {}, Spot Balance: {}, Spot Order Updates: {}, Spot Trade Updates: {}, Spot Candlesticks: {}, Spot Depth Snapshots: {}, Spot Depth Updates: {}, Spot Current Prices: {}, Spot Price Stats: {}, Spot New Trades: {}, Spot Price Changes: {}, Futures Position Updates: {}, Futures Order Updates: {}, Futures Balance Updates: {}, Futures Candlesticks: {}, Futures Orderbooks: {}, Futures Current Prices: {}, Futures New Trades: {}", 
-                        spotCountAfter, futuresCountAfter, spotBalanceCountAfter, spotOrderUpdateCountAfter, spotTradeUpdateCountAfter, spotCandlestickCountAfter, spotDepthSnapshotCountAfter, spotDepthUpdateCountAfter, spotCurrentPriceCountAfter, spotPriceStatsCountAfter, spotNewTradeCountAfter, spotPriceChangeCountAfter, futuresPositionUpdateCountAfter, futuresOrderUpdateCountAfter, balanceUpdateCountAfter, futuresCandlestickCountAfter, futuresOrderbookCountAfter, futuresCurrentPricesCountAfter, futuresNewTradeCountAfter);
+            logger.info("  Futures Instrument Price records deleted: {}", futuresInstrumentPriceDeleted);
+            logger.info("  Total deleted: {}", spotDeleted + futuresDeleted + spotBalanceDeleted + spotOrderUpdateDeleted + spotTradeUpdateDeleted + spotCandlestickDeleted + spotDepthSnapshotDeleted + spotDepthUpdateDeleted + spotCurrentPriceDeleted + spotPriceStatsDeleted + spotNewTradeDeleted + spotPriceChangeDeleted + futuresPositionUpdateDeleted + futuresOrderUpdateDeleted + balanceUpdateDeleted + futuresCandlestickDeleted + futuresOrderbookDeleted + futuresCurrentPricesDeleted + futuresNewTradeDeleted + futuresInstrumentPriceDeleted);
+            logger.info("  Remaining - Spot: {}, Futures: {}, Spot Balance: {}, Spot Order Updates: {}, Spot Trade Updates: {}, Spot Candlesticks: {}, Spot Depth Snapshots: {}, Spot Depth Updates: {}, Spot Current Prices: {}, Spot Price Stats: {}, Spot New Trades: {}, Spot Price Changes: {}, Futures Position Updates: {}, Futures Order Updates: {}, Futures Balance Updates: {}, Futures Candlesticks: {}, Futures Orderbooks: {}, Futures Current Prices: {}, Futures New Trades: {}, Futures Instrument Prices: {}", 
+                        spotCountAfter, futuresCountAfter, spotBalanceCountAfter, spotOrderUpdateCountAfter, spotTradeUpdateCountAfter, spotCandlestickCountAfter, spotDepthSnapshotCountAfter, spotDepthUpdateCountAfter, spotCurrentPriceCountAfter, spotPriceStatsCountAfter, spotNewTradeCountAfter, spotPriceChangeCountAfter, futuresPositionUpdateCountAfter, futuresOrderUpdateCountAfter, balanceUpdateCountAfter, futuresCandlestickCountAfter, futuresOrderbookCountAfter, futuresCurrentPricesCountAfter, futuresNewTradeCountAfter, futuresInstrumentPriceCountAfter);
             
         } catch (Exception e) {
             logger.error("Error during WebSocket data cleanup", e);
@@ -284,7 +295,8 @@ public class WebSocketDataCleanupService {
             long futuresOrderbookCount = futuresOrderbookDataRepository.count();
             long futuresCurrentPricesCount = futuresCurrentPricesDataRepository.count();
             long futuresNewTradeCount = futuresNewTradeDataRepository.count();
-            long totalCount = spotCount + futuresCount + spotBalanceCount + spotOrderUpdateCount + spotTradeUpdateCount + spotCandlestickCount + spotDepthSnapshotCount + spotDepthUpdateCount + spotCurrentPriceCount + spotPriceStatsCount + spotNewTradeCount + spotPriceChangeCount + futuresPositionUpdateCount + futuresOrderUpdateCount + balanceUpdateCount + futuresCandlestickCount + futuresOrderbookCount + futuresCurrentPricesCount + futuresNewTradeCount;
+            long futuresInstrumentPriceCount = futuresInstrumentPriceRepository.count();
+            long totalCount = spotCount + futuresCount + spotBalanceCount + spotOrderUpdateCount + spotTradeUpdateCount + spotCandlestickCount + spotDepthSnapshotCount + spotDepthUpdateCount + spotCurrentPriceCount + spotPriceStatsCount + spotNewTradeCount + spotPriceChangeCount + futuresPositionUpdateCount + futuresOrderUpdateCount + balanceUpdateCount + futuresCandlestickCount + futuresOrderbookCount + futuresCurrentPricesCount + futuresNewTradeCount + futuresInstrumentPriceCount;
             
             logger.info("═══════════════════════════════════════════");
             logger.info("WebSocket Data Storage Statistics");
@@ -307,6 +319,7 @@ public class WebSocketDataCleanupService {
             logger.info("  Futures Orderbooks:     {} records", futuresOrderbookCount);
             logger.info("  Futures Current Prices: {} records", futuresCurrentPricesCount);
             logger.info("  Futures New Trades:     {} records", futuresNewTradeCount);
+            logger.info("  Futures Instrument Prices: {} records", futuresInstrumentPriceCount);
             logger.info("  Total Records:          {} records", totalCount);
             logger.info("  Retention Days:         {} days", retentionDays);
             logger.info("═══════════════════════════════════════════");

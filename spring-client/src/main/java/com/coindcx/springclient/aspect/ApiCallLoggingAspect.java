@@ -3,6 +3,8 @@ package com.coindcx.springclient.aspect;
 import com.coindcx.springclient.dao.ApiCallLogDao;
 import com.coindcx.springclient.entity.ApiCallLog;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSerializer;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Aspect for logging all API calls made through service layer
@@ -22,6 +25,7 @@ import java.time.LocalDateTime;
 public class ApiCallLoggingAspect {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiCallLoggingAspect.class);
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final ApiCallLogDao apiCallLogDao;
     private final Gson gson;
@@ -29,7 +33,12 @@ public class ApiCallLoggingAspect {
     @Autowired
     public ApiCallLoggingAspect(ApiCallLogDao apiCallLogDao) {
         this.apiCallLogDao = apiCallLogDao;
-        this.gson = new Gson();
+        // Configure Gson with LocalDateTime TypeAdapter to avoid Java 17 module access issues
+        this.gson = new GsonBuilder()
+                .registerTypeAdapter(LocalDateTime.class, 
+                    (JsonSerializer<LocalDateTime>) (src, typeOfSrc, context) -> 
+                        context.serialize(src.format(DATE_TIME_FORMATTER)))
+                .create();
     }
 
     /**

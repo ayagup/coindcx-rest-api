@@ -1,15 +1,31 @@
 package com.coindcx.springclient.controller;
 
+import com.coindcx.springclient.config.WebSocketConfig;
 import com.coindcx.springclient.entity.WebSocketFuturesOrderUpdateData;
 import com.coindcx.springclient.repository.WebSocketFuturesOrderUpdateDataRepository;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 @RestController
@@ -17,8 +33,17 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class WebSocketFuturesOrderUpdateController {
 
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketFuturesOrderUpdateController.class);
+    private static final String FUTURES_ORDERS_URL = "https://api.coindcx.com/exchange/v1/derivatives/futures/orders";
+    private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
+
     @Autowired
     private WebSocketFuturesOrderUpdateDataRepository repository;
+
+    @Autowired
+    private WebSocketConfig webSocketConfig;
+
+    private final OkHttpClient httpClient = new OkHttpClient();
 
     /**
      * Get overall statistics
@@ -229,12 +254,17 @@ public class WebSocketFuturesOrderUpdateController {
     }
 
     /**
-     * Get recent order updates
+     * Get recent order updates. Falls back to CoinDCX REST API when DB is empty.
      */
     @GetMapping("/recent/{limit}")
     public ResponseEntity<List<WebSocketFuturesOrderUpdateData>> getRecent(
             @PathVariable int limit) {
-        return ResponseEntity.ok(repository.findRecentOrderUpdates(Math.min(limit, 1000)));
+        int cap = Math.min(limit, 1000);
+        List<WebSocketFuturesOrderUpdateData> data = repository.findRecentOrderUpdates(cap);
+        if (data == null || data.isEmpty()) {
+            data = fetchFromRestApi(cap);
+        }
+        return ResponseEntity.ok(data != null ? data : Collections.emptyList());
     }
 
     /**
@@ -426,5 +456,117 @@ public class WebSocketFuturesOrderUpdateController {
         result.put("cutoffDate", cutoff);
         
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Fetch recent futures orders from the CoinDCX REST API.
+     * Used as a fallback when the DB table has no WebSocket-persisted records.
+     * Results are in-memory only (not persisted).
+     */
+    private List<WebSocketFuturesOrderUpdateData> fetchFromRestApi(int limit) {
+        String apiKey = webSocketConfig.getApiKey();
+        String apiSecret = webSocketConfig.getApiSecret();
+        if (apiKey == null || apiKey.isEmpty() || apiSecret == null || apiSecret.isEmpty()) {
+            logger.debug("REST fallback skipped: API credentials not configured");
+            return Collections.emptyList();
+        }
+        try {
+            long timestamp = System.currentTimeMillis();
+            int size = Math.min(limit, 100);
+            String payload = "{\"timestamp\":\"" + timestamp + "\",\"page\":\"1\",\"size\":\"" + size + "\"}";
+            String signature = hmacSha256(payload, apiSecret);
+
+            RequestBody body = RequestBody.create(payload, JSON_MEDIA_TYPE);
+            Request request = new Request.Builder()
+                    .url(FUTURES_ORDERS_URL)
+                    .post(body)
+                    .addHeader("X-AUTH-APIKEY", apiKey)
+                    .addHeader("X-AUTH-SIGNATURE", signature)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    logger.warn("REST fallback futures orders: HTTP {}", response.code());
+                    return Collections.emptyList();
+                }
+                String bodyStr = response.body() != null ? response.body().string() : null;
+                if (bodyStr == null || bodyStr.isBlank()) return Collections.emptyList();
+
+                // Response may be a JSON array or {"orders": [...]}
+                JsonArray ordersArray = null;
+                com.google.gson.JsonElement parsed = JsonParser.parseString(bodyStr);
+                if (parsed.isJsonArray()) {
+                    ordersArray = parsed.getAsJsonArray();
+                } else if (parsed.isJsonObject()) {
+                    JsonObject obj = parsed.getAsJsonObject();
+                    if (obj.has("orders") && obj.get("orders").isJsonArray()) {
+                        ordersArray = obj.getAsJsonArray("orders");
+                    }
+                }
+                if (ordersArray == null) return Collections.emptyList();
+
+                List<WebSocketFuturesOrderUpdateData> result = new ArrayList<>();
+                for (JsonElement el : ordersArray) {
+                    if (!el.isJsonObject()) continue;
+                    JsonObject o = el.getAsJsonObject();
+                    WebSocketFuturesOrderUpdateData entity = new WebSocketFuturesOrderUpdateData();
+                    mapJsonToEntity(o, entity);
+                    entity.setChannelName("rest-api");
+                    result.add(entity);
+                }
+                return result;
+            }
+        } catch (Exception e) {
+            logger.warn("REST fallback futures orders failed: {}", e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
+    /** Map a REST API / WebSocket JSON object to a entity instance. */
+    private void mapJsonToEntity(JsonObject j, WebSocketFuturesOrderUpdateData e) {
+        if (j.has("id") && !j.get("id").isJsonNull()) e.setOrderId(j.get("id").getAsString());
+        if (j.has("pair") && !j.get("pair").isJsonNull()) e.setPair(j.get("pair").getAsString());
+        if (j.has("side") && !j.get("side").isJsonNull()) e.setSide(j.get("side").getAsString());
+        if (j.has("status") && !j.get("status").isJsonNull()) e.setStatus(j.get("status").getAsString());
+        if (j.has("order_type") && !j.get("order_type").isJsonNull()) e.setOrderType(j.get("order_type").getAsString());
+        if (j.has("stop_trigger_instruction") && !j.get("stop_trigger_instruction").isJsonNull()) e.setStopTriggerInstruction(j.get("stop_trigger_instruction").getAsString());
+        if (j.has("notification") && !j.get("notification").isJsonNull()) e.setNotification(j.get("notification").getAsString());
+        if (j.has("leverage") && !j.get("leverage").isJsonNull()) e.setLeverage(j.get("leverage").getAsDouble());
+        if (j.has("maker_fee") && !j.get("maker_fee").isJsonNull()) e.setMakerFee(j.get("maker_fee").getAsDouble());
+        if (j.has("taker_fee") && !j.get("taker_fee").isJsonNull()) e.setTakerFee(j.get("taker_fee").getAsDouble());
+        if (j.has("fee_amount") && !j.get("fee_amount").isJsonNull()) e.setFeeAmount(j.get("fee_amount").getAsDouble());
+        if (j.has("price") && !j.get("price").isJsonNull()) e.setPrice(j.get("price").getAsDouble());
+        if (j.has("stop_price") && !j.get("stop_price").isJsonNull()) e.setStopPrice(j.get("stop_price").getAsDouble());
+        if (j.has("avg_price") && !j.get("avg_price").isJsonNull()) e.setAvgPrice(j.get("avg_price").getAsDouble());
+        if (j.has("take_profit_price") && !j.get("take_profit_price").isJsonNull()) e.setTakeProfitPrice(j.get("take_profit_price").getAsDouble());
+        if (j.has("stop_loss_price") && !j.get("stop_loss_price").isJsonNull()) e.setStopLossPrice(j.get("stop_loss_price").getAsDouble());
+        if (j.has("total_quantity") && !j.get("total_quantity").isJsonNull()) e.setTotalQuantity(j.get("total_quantity").getAsDouble());
+        if (j.has("remaining_quantity") && !j.get("remaining_quantity").isJsonNull()) e.setRemainingQuantity(j.get("remaining_quantity").getAsDouble());
+        if (j.has("cancelled_quantity") && !j.get("cancelled_quantity").isJsonNull()) e.setCancelledQuantity(j.get("cancelled_quantity").getAsDouble());
+        if (j.has("ideal_margin") && !j.get("ideal_margin").isJsonNull()) e.setIdealMargin(j.get("ideal_margin").getAsDouble());
+        if (j.has("order_category") && !j.get("order_category").isJsonNull()) e.setOrderCategory(j.get("order_category").getAsString());
+        if (j.has("stage") && !j.get("stage").isJsonNull()) e.setStage(j.get("stage").getAsString());
+        if (j.has("created_at") && !j.get("created_at").isJsonNull()) e.setCreatedAt(j.get("created_at").getAsLong());
+        if (j.has("updated_at") && !j.get("updated_at").isJsonNull()) e.setUpdatedAt(j.get("updated_at").getAsLong());
+        if (j.has("display_message") && !j.get("display_message").isJsonNull()) e.setDisplayMessage(j.get("display_message").getAsString());
+        if (j.has("group_status") && !j.get("group_status").isJsonNull()) e.setGroupStatus(j.get("group_status").getAsString());
+        if (j.has("group_id") && !j.get("group_id").isJsonNull()) e.setGroupId(j.get("group_id").getAsString());
+        if (j.has("margin_currency_short_name") && !j.get("margin_currency_short_name").isJsonNull()) e.setMarginCurrencyShortName(j.get("margin_currency_short_name").getAsString());
+        if (j.has("settlement_currency_conversion_price") && !j.get("settlement_currency_conversion_price").isJsonNull()) e.setSettlementCurrencyConversionPrice(j.get("settlement_currency_conversion_price").getAsDouble());
+        if (j.has("trade_count") && !j.get("trade_count").isJsonNull()) e.setTradeCount(j.get("trade_count").getAsInt());
+        // filled_quantity derived
+        if (e.getTotalQuantity() != null && e.getRemainingQuantity() != null) {
+            double filled = e.getTotalQuantity() - e.getRemainingQuantity()
+                    - (e.getCancelledQuantity() != null ? e.getCancelledQuantity() : 0.0);
+            e.setFilledQuantity(filled);
+        }
+        e.setRecordTimestamp(LocalDateTime.now());
+    }
+
+    /** Generate HMAC-SHA256 hex signature. */
+    private String hmacSha256(String data, String secret) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
     }
 }
