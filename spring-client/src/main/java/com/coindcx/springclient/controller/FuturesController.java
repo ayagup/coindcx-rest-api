@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 
@@ -84,9 +85,10 @@ public class FuturesController {
             req.setOrderType(ExchangeV1DerivativesFuturesOrdersCreatePostRequest.OrderTypeEnum.fromValue(orderTypeStr.toLowerCase()));
 
             // total_quantity: accept both "quantity" (frontend) and "total_quantity" (direct)
+            // Truncate to 3 decimal places (CoinDCX step size = 0.001) — use DOWN so we never exceed intended margin
             Object qtyRaw = body.containsKey("total_quantity") ? body.get("total_quantity") : body.get("quantity");
             if (qtyRaw == null) return ResponseEntity.badRequest().body("Error: 'quantity' or 'total_quantity' is required");
-            req.setTotalQuantity(new BigDecimal(qtyRaw.toString()));
+            req.setTotalQuantity(new BigDecimal(qtyRaw.toString()).setScale(3, RoundingMode.DOWN));
 
             // leverage (optional)
             Object leverageRaw = body.get("leverage");
@@ -252,36 +254,121 @@ public class FuturesController {
     }
 
     /**
-     * Exit a futures position
-     * 
-     * @param request Exit position request
-     * @return Exit response
+     * Exit a futures position.
+     * Accepts frontend-friendly fields:
+     *   market      → pair used to resolve position id from the positions API
+     *   position_id → direct position UUID (overrides market lookup)
+     * timestamp is injected automatically.
      */
     @PostMapping("/positions/exit")
-    public ResponseEntity<ExchangeV1DerivativesFuturesPositionsExitPost200Response> exitPosition(
-            @RequestBody ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest request) {
+    public ResponseEntity<Object> exitPosition(@RequestBody Map<String, Object> body) {
         try {
+            // Resolve position id
+            String positionId = null;
+            if (body.containsKey("position_id") && body.get("position_id") != null) {
+                positionId = body.get("position_id").toString();
+            } else {
+                String pair = body.containsKey("market") ? (String) body.get("market")
+                        : (String) body.get("pair");
+                if (pair != null && !pair.isBlank()) {
+                    positionId = futuresService.fetchActivePositionId(pair);
+                }
+            }
+            if (positionId == null || positionId.isBlank()) {
+                String pairDesc = body.getOrDefault("market", body.getOrDefault("pair", "unknown")).toString();
+                return ResponseEntity.badRequest()
+                        .header("Content-Type", "application/json")
+                        .body("{\"error\":\"No active position found for " + pairDesc
+                                + ". Cannot exit a position that is not open.\"}");
+            }
+
+            ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest request =
+                    new ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest();
+            request.setTimestamp(System.currentTimeMillis());
+            request.setId(positionId);
+
             ExchangeV1DerivativesFuturesPositionsExitPost200Response response = futuresService.exitPosition(request);
             return ResponseEntity.ok(response);
         } catch (ApiException e) {
-            return ResponseEntity.status(e.getCode()).body(null);
+            return ResponseEntity.status(e.getCode())
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"" + e.getMessage() + "\"}");
         }
     }
 
     /**
-     * Create TP/SL for position
-     * 
-     * @param request TP/SL creation request
-     * @return Success response
+     * Create TP/SL for position.
+     * Accepts frontend-friendly fields:
+     *   market       → pair used to resolve position id from WebSocket data
+     *   position_id  → direct position id (overrides market lookup)
+     *   target_price → mapped to take_profit.stop_price (take_profit_market)
+     *   stop_loss    → mapped to stop_loss.stop_price  (stop_market)
+     * timestamp is injected automatically.
      */
     @PostMapping("/positions/create-tpsl")
-    public ResponseEntity<String> createTpSl(
-            @RequestBody ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest request) {
+    public ResponseEntity<String> createTpSl(@RequestBody Map<String, Object> body) {
         try {
-            futuresService.createTpSl(request);
-            return ResponseEntity.ok("TP/SL created successfully");
+            // Resolve position id
+            String positionId = null;
+            if (body.containsKey("position_id") && body.get("position_id") != null) {
+                positionId = body.get("position_id").toString();
+            } else {
+                String pair = body.containsKey("market") ? (String) body.get("market")
+                        : (String) body.get("pair");
+                if (pair != null && !pair.isBlank()) {
+                    positionId = futuresService.fetchActivePositionId(pair);
+                }
+            }
+            if (positionId == null || positionId.isBlank()) {
+                return ResponseEntity.badRequest()
+                        .header("Content-Type", "application/json")
+                        .body("{\"error\":\"No active (filled) position found for " +
+                                (body.containsKey("market") ? body.get("market") : body.get("pair")) +
+                                ". TP/SL can only be set on a position with non-zero active_pos. " +
+                                "Pending limit orders are not eligible.\"}");
+            }
+
+            ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest req =
+                    new ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest();
+            req.setTimestamp(System.currentTimeMillis());
+            req.setId(positionId);
+
+            // take_profit from target_price
+            Object tpRaw = body.containsKey("target_price") ? body.get("target_price") : body.get("take_profit_price");
+            if (tpRaw != null) {
+                ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestTakeProfit tp =
+                        new ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestTakeProfit();
+                tp.setStopPrice(new BigDecimal(tpRaw.toString()).toPlainString());
+                tp.setOrderType(ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestTakeProfit.OrderTypeEnum.TAKE_PROFIT_MARKET);
+                req.setTakeProfit(tp);
+            }
+
+            // stop_loss from stop_loss field
+            Object slRaw = body.containsKey("stop_loss") ? body.get("stop_loss") : body.get("stop_loss_price");
+            if (slRaw != null) {
+                ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestStopLoss sl =
+                        new ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestStopLoss();
+                sl.setStopPrice(new BigDecimal(slRaw.toString()).toPlainString());
+                sl.setOrderType(ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestStopLoss.OrderTypeEnum.STOP_MARKET);
+                req.setStopLoss(sl);
+            }
+
+            if (req.getTakeProfit() == null && req.getStopLoss() == null) {
+                return ResponseEntity.badRequest()
+                        .body("{\"error\":\"At least one of 'target_price' (TP) or 'stop_loss' (SL) must be provided\"}");
+            }
+
+            futuresService.createTpSl(req);
+            return ResponseEntity.ok("{\"message\":\"TP/SL created successfully\"}");
         } catch (ApiException e) {
-            return ResponseEntity.status(e.getCode()).body("Error: " + e.getMessage());
+            int status = e.getCode() > 0 ? e.getCode() : 500;
+            return ResponseEntity.status(status)
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
         }
     }
 

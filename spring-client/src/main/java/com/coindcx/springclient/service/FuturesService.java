@@ -6,8 +6,14 @@ import com.coindcx.springclient.client.auth.ApiKeyAuth;
 import com.coindcx.springclient.client.auth.HmacSignatureAuth;
 import com.coindcx.springclient.config.WebSocketConfig;
 import com.coindcx.springclient.model.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import okhttp3.Call;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +28,8 @@ import java.util.Map;
  */
 @Service
 public class FuturesService {
+
+    private static final Logger logger = LoggerFactory.getLogger(FuturesService.class);
 
     private final FuturesApi futuresApi;
 
@@ -259,6 +267,119 @@ public class FuturesService {
      */
     public MarketDataV3OrderbookInstrumentFuturesDepthGet200Response getDepth(String instrument, String depth) throws ApiException {
         return futuresApi.marketDataV3OrderbookInstrumentFuturesDepthGet(instrument, depth);
+    }
+
+    /**
+     * Fetch the active position ID for a given pair by calling the CoinDCX positions API.
+     * Returns null if no matching active position is found.
+     *
+     * @param pair CoinDCX pair, e.g. "B-ETH_USDT"
+     * @return position id string, or null if not found
+     * @throws ApiException if the API call fails
+     */
+    public String fetchActivePositionId(String pair) throws ApiException {
+        // Mirror the CoinDCX MCP client exactly:
+        //   - use margin_currency_short_name as a JSON array ["USDT"]
+        //   - do NOT pass a "pairs" filter (causes CoinDCX to return stale/zero active_pos)
+        //   - filter by pair client-side
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", System.currentTimeMillis());
+        body.put("page", "1");
+        body.put("size", "50");
+        body.put("margin_currency_short_name", List.of("USDT"));
+
+        Map<String, String> headerParams = new HashMap<>();
+        headerParams.put("Content-Type", "application/json");
+        headerParams.put("Accept", "application/json");
+
+        Call call = futuresApi.getApiClient().buildCall(
+                null,
+                "/exchange/v1/derivatives/futures/positions",
+                "POST",
+                new ArrayList<>(),
+                new ArrayList<>(),
+                body,
+                headerParams,
+                new HashMap<>(),
+                new HashMap<>(),
+                new String[]{"ApiKeyAuth", "SignatureAuth"},
+                null
+        );
+
+        try (Response response = call.execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "[]";
+            logger.info("[fetchActivePositionId] pair={} HTTP={} body={}", pair, response.code(), responseBody);
+            if (!response.isSuccessful()) {
+                throw new ApiException(response.code(), "Positions fetch failed: " + responseBody);
+            }
+
+            // Unwrap array — response may be a bare array or { "data": [...] }
+            JsonElement root = JsonParser.parseString(responseBody);
+            JsonArray positions;
+            if (root.isJsonArray()) {
+                positions = root.getAsJsonArray();
+            } else if (root.isJsonObject() && root.getAsJsonObject().has("data")) {
+                JsonElement dataEl = root.getAsJsonObject().get("data");
+                positions = dataEl.isJsonArray() ? dataEl.getAsJsonArray() : new JsonArray();
+            } else {
+                positions = new JsonArray();
+            }
+
+            logger.info("[fetchActivePositionId] {} positions returned for pair={}", positions.size(), pair);
+
+            for (JsonElement el : positions) {
+                if (!el.isJsonObject()) continue;
+                JsonObject pos = el.getAsJsonObject();
+
+                // Match pair — field may be "pair" or "market"
+                String posPair = getString(pos, "pair", "market");
+                if (!pair.equals(posPair)) {
+                    logger.debug("[fetchActivePositionId] skipping position with pair='{}'", posPair);
+                    continue;
+                }
+
+                String posId = pos.has("id") ? pos.get("id").getAsString() : null;
+                if (posId == null || posId.isBlank()) continue;
+
+                // active_pos is the authoritative CoinDCX field for filled position size.
+                // Non-zero means a real open position (+ = long, - = short).
+                // inactive_pos_buy / inactive_pos_sell are pending unfilled orders — not eligible for TPSL.
+                double activePos = getDouble(pos, "active_pos", "active_quantity", "qty", "quantity");
+                logger.info("[fetchActivePositionId] position id={} pair={} active_pos={} allKeys={}",
+                        posId, posPair, activePos, pos.keySet());
+
+                if (activePos != 0) {
+                    logger.info("[fetchActivePositionId] resolved active position id={} for pair={}", posId, pair);
+                    return posId;
+                }
+                logger.info("[fetchActivePositionId] position {} active_pos=0 (unfilled/closed), skipping", posId);
+            }
+
+            logger.warn("[fetchActivePositionId] no active (filled) position found for pair={}", pair);
+            return null;
+        } catch (IOException e) {
+            throw new ApiException("IO error fetching positions: " + e.getMessage());
+        }
+    }
+
+    /** Get first non-null string value from pos for the given field names. */
+    private String getString(JsonObject pos, String... fields) {
+        for (String f : fields) {
+            if (pos.has(f) && !pos.get(f).isJsonNull()) {
+                return pos.get(f).getAsString();
+            }
+        }
+        return "";
+    }
+
+    /** Get double value from pos, trying each field name in order; returns 0 if none found or parse fails. */
+    private double getDouble(JsonObject pos, String... fields) {
+        for (String f : fields) {
+            if (pos.has(f) && !pos.get(f).isJsonNull()) {
+                try { return pos.get(f).getAsDouble(); } catch (Exception ignored) {}
+            }
+        }
+        return 0;
     }
 
     /**

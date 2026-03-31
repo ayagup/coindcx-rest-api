@@ -178,13 +178,18 @@ public class WebSocketFuturesPositionUpdateController {
     @GetMapping("/status/{status}")
     public ResponseEntity<List<WebSocketFuturesPositionUpdateData>> getByStatus(
             @PathVariable String status) {
-        List<WebSocketFuturesPositionUpdateData> data = repository.findByStatusOrderByUpdateTimestampDesc(status);
-        // Also try "inactive" alias for "closed"
-        if ((data == null || data.isEmpty()) && "closed".equalsIgnoreCase(status)) {
-            data = repository.findByStatusOrderByUpdateTimestampDesc("inactive");
+        // Normalise aliases: "open" -> "active", "closed" -> "inactive"
+        String dbStatus = status;
+        if ("open".equalsIgnoreCase(status)) dbStatus = "active";
+        else if ("closed".equalsIgnoreCase(status)) dbStatus = "inactive";
+
+        List<WebSocketFuturesPositionUpdateData> data = repository.findByStatusOrderByUpdateTimestampDesc(dbStatus);
+        // Also try secondary alias: "inactive" for "closed"
+        if ((data == null || data.isEmpty()) && "inactive".equals(dbStatus)) {
+            data = repository.findByStatusOrderByUpdateTimestampDesc("closed");
         }
         if (data == null || data.isEmpty()) {
-            data = fetchPositionsFromRestApi(status, 100);
+            data = fetchPositionsFromRestApi(dbStatus, 100);
         }
         return ResponseEntity.ok(data != null ? data : Collections.emptyList());
     }
@@ -570,11 +575,14 @@ public class WebSocketFuturesPositionUpdateController {
                     mapPositionJsonToEntity(p, entity);
                     entity.setChannelName("rest-api");
 
-                    // Filter by requested status
+                    // Filter by requested status (support aliases: active/open, inactive/closed)
                     if (statusFilter != null && !statusFilter.isBlank()) {
                         String es = entity.getStatus();
                         boolean match = statusFilter.equalsIgnoreCase(es)
-                                || ("closed".equalsIgnoreCase(statusFilter) && "inactive".equalsIgnoreCase(es));
+                                || ("closed".equalsIgnoreCase(statusFilter) && "inactive".equalsIgnoreCase(es))
+                                || ("inactive".equalsIgnoreCase(statusFilter) && "closed".equalsIgnoreCase(es))
+                                || ("open".equalsIgnoreCase(statusFilter) && "active".equalsIgnoreCase(es))
+                                || ("active".equalsIgnoreCase(statusFilter) && "open".equalsIgnoreCase(es));
                         if (!match) continue;
                     }
                     result.add(entity);

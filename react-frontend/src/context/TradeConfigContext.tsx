@@ -20,9 +20,9 @@ interface TradeConfigContextType {
 export const DEFAULT_TRADE_CONFIG: TradeConfig = {
   marginUsdt: 50,
   leverage: 10,
-  tp1Pips: 50,
-  tp2Pips: 100,
-  tp3Pips: 200,
+  tp1Pips: 30,
+  tp2Pips: 50,
+  tp3Pips: 80,
   slPips: 30,
 };
 

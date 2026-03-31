@@ -27,7 +27,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.HexFormat;
 import java.util.stream.Collectors;
-
 @RestController
 @RequestMapping("/api/websocket/futures-order-update")
 @CrossOrigin(origins = "*")
@@ -182,13 +181,46 @@ public class WebSocketFuturesOrderUpdateController {
     }
 
     /**
-     * Get orders by pair and status
+     * Get orders by pair and status.
+     * Falls back to the CoinDCX REST API when the local DB is empty.
+     * Status alias: "open" matches CoinDCX statuses "open", "partially_filled", and "untriggered".
      */
     @GetMapping("/pair/{pair}/status/{status}")
     public ResponseEntity<List<WebSocketFuturesOrderUpdateData>> getByPairAndStatus(
             @PathVariable String pair,
             @PathVariable String status) {
-        return ResponseEntity.ok(repository.findByPairAndStatusOrderByUpdatedAtDesc(pair, status));
+        // Expand "open" alias to the set of statuses CoinDCX uses for active orders
+        Set<String> matchStatuses = expandStatus(status);
+
+        // Query DB for each matching status, merge results
+        List<WebSocketFuturesOrderUpdateData> dbResults = new ArrayList<>();
+        for (String s : matchStatuses) {
+            dbResults.addAll(repository.findByPairAndStatusOrderByUpdatedAtDesc(pair, s));
+        }
+        dbResults.sort(Comparator.comparingLong(o -> o.getUpdatedAt() != null ? -o.getUpdatedAt() : 0));
+
+        if (!dbResults.isEmpty()) {
+            return ResponseEntity.ok(dbResults);
+        }
+
+        // DB is empty — fall back to REST API with pair + status filters
+        List<WebSocketFuturesOrderUpdateData> restResults = fetchFromRestApi(100, pair, matchStatuses);
+        return ResponseEntity.ok(restResults);
+    }
+
+    /**
+     * Expand a user-facing status label to the set of CoinDCX API status values it covers.
+     * "open" → {open, partially_filled, untriggered}  (all in-flight / active order states)
+     * anything else → the literal value wrapped in a singleton set.
+     */
+    private Set<String> expandStatus(String status) {
+        if (status == null) return Collections.emptySet();
+        String lower = status.toLowerCase();
+        if ("open".equals(lower)) {
+            // "untriggered" = stop/TP/SL orders waiting to be triggered (TP/SL on active positions)
+            return new HashSet<>(Arrays.asList("open", "partially_filled", "untriggered"));
+        }
+        return Collections.singleton(lower);
     }
 
     /**
@@ -262,7 +294,7 @@ public class WebSocketFuturesOrderUpdateController {
         int cap = Math.min(limit, 1000);
         List<WebSocketFuturesOrderUpdateData> data = repository.findRecentOrderUpdates(cap);
         if (data == null || data.isEmpty()) {
-            data = fetchFromRestApi(cap);
+            data = fetchFromRestApi(cap, null, null);
         }
         return ResponseEntity.ok(data != null ? data : Collections.emptyList());
     }
@@ -459,11 +491,16 @@ public class WebSocketFuturesOrderUpdateController {
     }
 
     /**
-     * Fetch recent futures orders from the CoinDCX REST API.
+     * Fetch futures orders from the CoinDCX REST API.
      * Used as a fallback when the DB table has no WebSocket-persisted records.
      * Results are in-memory only (not persisted).
+     *
+     * @param limit       max records per page (capped at 100)
+     * @param pairFilter  optional pair to pass as server-side filter (null = all pairs)
+     * @param statuses    optional set of statuses to filter in-memory (null/empty = all statuses)
      */
-    private List<WebSocketFuturesOrderUpdateData> fetchFromRestApi(int limit) {
+    private List<WebSocketFuturesOrderUpdateData> fetchFromRestApi(
+            int limit, String pairFilter, Set<String> statuses) {
         String apiKey = webSocketConfig.getApiKey();
         String apiSecret = webSocketConfig.getApiSecret();
         if (apiKey == null || apiKey.isEmpty() || apiSecret == null || apiSecret.isEmpty()) {
@@ -473,7 +510,16 @@ public class WebSocketFuturesOrderUpdateController {
         try {
             long timestamp = System.currentTimeMillis();
             int size = Math.min(limit, 100);
-            String payload = "{\"timestamp\":\"" + timestamp + "\",\"page\":\"1\",\"size\":\"" + size + "\"}";
+
+            // Build payload — include optional pair filter for server-side narrowing
+            StringBuilder payloadSb = new StringBuilder();
+            payloadSb.append("{\"timestamp\":\"").append(timestamp)
+                     .append("\",\"page\":\"1\",\"size\":\"").append(size).append("\"");
+            if (pairFilter != null && !pairFilter.isBlank()) {
+                payloadSb.append(",\"pairs\":\"").append(pairFilter).append("\"");
+            }
+            payloadSb.append("}");
+            String payload = payloadSb.toString();
             String signature = hmacSha256(payload, apiSecret);
 
             RequestBody body = RequestBody.create(payload, JSON_MEDIA_TYPE);
@@ -512,6 +558,11 @@ public class WebSocketFuturesOrderUpdateController {
                     WebSocketFuturesOrderUpdateData entity = new WebSocketFuturesOrderUpdateData();
                     mapJsonToEntity(o, entity);
                     entity.setChannelName("rest-api");
+                    // Apply in-memory status filter when requested
+                    if (statuses != null && !statuses.isEmpty()) {
+                        String s = entity.getStatus();
+                        if (s == null || !statuses.contains(s.toLowerCase())) continue;
+                    }
                     result.add(entity);
                 }
                 return result;

@@ -417,18 +417,21 @@ const FuturesTradingPage: React.FC = () => {
   const handlePlaceOrder = async () => {
     // Auto-compute quantity from config margin if not manually entered
     let qty = Number(form.quantity);
+
+    // Resolve a live price — needed for both quantity calc and TP/SL computation.
+    // Re-fetch on demand when latestPrice hasn't loaded yet (common for market orders).
+    let currentPrice = latestPrice;
+    if (!currentPrice && form.orderType === 'market') {
+      try {
+        const res = await apiService.getFuturesMarketDataPublic(form.contract, 20);
+        const arr: any[] = Array.isArray(res.data) ? res.data : [];
+        const record = [...arr].reverse().find(r => r.markPrice != null && Number(r.markPrice) > 0);
+        const p = record?.markPrice ?? record?.price ?? record?.mark_price;
+        if (p && Number(p) > 0) { currentPrice = Number(p); setLatestPrice(currentPrice); }
+      } catch (_) {}
+    }
+
     if (!qty || qty <= 0) {
-      // If latestPrice is not yet loaded, fetch it on demand
-      let currentPrice = latestPrice;
-      if (!currentPrice && form.orderType === 'market') {
-        try {
-          const res = await apiService.getFuturesMarketDataPublic(form.contract, 20);
-          const arr: any[] = Array.isArray(res.data) ? res.data : [];
-          const record = [...arr].reverse().find(r => r.markPrice != null && Number(r.markPrice) > 0);
-          const p = record?.markPrice ?? record?.price ?? record?.mark_price;
-          if (p && Number(p) > 0) { currentPrice = Number(p); setLatestPrice(currentPrice); }
-        } catch (_) {}
-      }
       const priceForQty = form.orderType === 'market' ? (currentPrice ?? 0) : Number(form.price);
       if (priceForQty > 0 && config.marginUsdt > 0 && config.leverage > 0) {
         qty = (config.marginUsdt * config.leverage) / priceForQty;
@@ -443,29 +446,113 @@ const FuturesTradingPage: React.FC = () => {
       return;
     }
 
+    // Compute TP/SL prices from the *resolved* price (not from stale render-time derived values).
+    const resolvedPrice = form.orderType === 'market'
+      ? currentPrice
+      : (Number(form.price) || currentPrice);
+    const isBuyOrder = form.side === 'buy';
+    const computedTp1 = resolvedPrice
+      ? (isBuyOrder ? resolvedPrice + config.tp1Pips : resolvedPrice - config.tp1Pips)
+      : null;
+    const computedTp2 = resolvedPrice
+      ? (isBuyOrder ? resolvedPrice + config.tp2Pips : resolvedPrice - config.tp2Pips)
+      : null;
+    const computedTp3 = resolvedPrice
+      ? (isBuyOrder ? resolvedPrice + config.tp3Pips : resolvedPrice - config.tp3Pips)
+      : null;
+    const computedSl = resolvedPrice
+      ? (isBuyOrder ? resolvedPrice - config.slPips : resolvedPrice + config.slPips)
+      : null;
+
     setSubmitting(true);
     setOrderMsg(null);
+
+    // Snapshot contract/side before any state mutations
+    const contract = form.contract;
+    const side = form.side;
+
     try {
       const payload: any = {
-        market: form.contract,
-        side: form.side,
+        market: contract,
+        side,
         order_type: form.orderType,
         quantity: qty,
         leverage: config.leverage,
         ...(form.orderType === 'limit' ? { price: Number(form.price) } : {}),
       };
-      await apiService.createFuturesOrderPublic(payload);
+      const orderRes = await apiService.createFuturesOrderPublic(payload);
 
-      // Auto TP/SL from config pips
-      if (tp1Price) {
-        await apiService.createTpSlPublic({ market: form.contract, target_price: Number(tp1Price.toFixed(2)) }).catch(() => {});
-      }
-      if (slPrice) {
-        await apiService.createTpSlPublic({ market: form.contract, stop_loss: Number(slPrice.toFixed(2)) }).catch(() => {});
-      }
+      // Extract order ID for logging only — not sent to create_tpsl.
+      const orderData = orderRes.data;
+      console.log('[createOrder] response:', orderData);
+      const orderItem = Array.isArray(orderData) ? orderData[0] : (orderData?.data ?? orderData);
+      const orderId: string | undefined = orderItem?.id ?? orderItem?.order_id ?? orderItem?.orderId;
+      console.log('[createOrder] orderId:', orderId, 'tp1:', computedTp1, 'tp2:', computedTp2, 'tp3:', computedTp3, 'sl:', computedSl);
 
-      setOrderMsg({ type: 'success', text: `${form.side === 'buy' ? 'Long' : 'Short'} order placed!` });
+      setOrderMsg({ type: 'success', text: `${side === 'buy' ? 'Long' : 'Short'} order placed! Setting TP/SL…` });
       setForm(f => ({ ...f, quantity: '', price: '' }));
+
+      // ── Create 3 × TP + 1 × SL after position becomes active ──────────────
+      // Each TP covers exactly 1/3 of the position quantity.
+      // SL covers the full quantity.
+      // Each order is a SEPARATE call — a single payload can only hold one `quantity` key.
+      const tpQty = Number((qty / 3).toFixed(4));
+      const tp3Qty = Number((qty - tpQty * 2).toFixed(4)); // remaining after TP1 + TP2
+
+      if (computedTp1 || computedTp2 || computedTp3 || computedSl) {
+        const RETRY_DELAYS_MS = [800, 1500, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000];
+        let positionActive = false;
+
+        // — Step 1: TP1 alone (retry until position is active) —
+        for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+          try {
+            const tp1Payload = { market: contract, take_profit_price: Number(computedTp1!.toFixed(2)), quantity: tpQty };
+            console.log(`[TP1] attempt ${attempt + 1}:`, tp1Payload);
+            await apiService.createTpSlPublic(tp1Payload);
+            positionActive = true;
+            break;
+          } catch (err: any) {
+            const errMsg: string =
+              err.response?.data?.error ?? err.response?.data?.message ?? err.message ?? '';
+            console.warn(`[TP1] attempt ${attempt + 1} failed:`, errMsg);
+            const isNotActiveYet =
+              errMsg.toLowerCase().includes('no active') ||
+              errMsg.toLowerCase().includes('not found') ||
+              errMsg.toLowerCase().includes('pending');
+            if (!isNotActiveYet || attempt === RETRY_DELAYS_MS.length - 1) {
+              setOrderMsg({ type: 'success', text: `Order placed, but TP1 failed: ${errMsg}` });
+              break;
+            }
+          }
+        }
+
+        // — Step 2: SL, TP2, TP3 — position confirmed active, fire sequentially —
+        if (positionActive) {
+          const remaining = [
+            computedSl  ? { label: 'SL',  stop_loss_price:   Number(computedSl.toFixed(2)),  quantity: qty    } : null,
+            computedTp2 ? { label: 'TP2', take_profit_price: Number(computedTp2.toFixed(2)), quantity: tpQty } : null,
+            computedTp3 ? { label: 'TP3', take_profit_price: Number(computedTp3.toFixed(2)), quantity: tp3Qty } : null,
+          ].filter(Boolean) as { label: string; quantity: number; take_profit_price?: number; stop_loss_price?: number }[];
+
+          const results: string[] = ['TP1 ✓'];
+          for (const order of remaining) {
+            const { label, ...apiPayload } = order;
+            try {
+              console.log(`[${label}] payload:`, { market: contract, ...apiPayload });
+              await apiService.createTpSlPublic({ market: contract, ...apiPayload });
+              results.push(`${label} ✓`);
+            } catch (err: any) {
+              const errMsg = err.response?.data?.error ?? err.response?.data?.message ?? err.message ?? '';
+              console.warn(`[${label}] failed:`, errMsg);
+              results.push(`${label} ✗`);
+            }
+          }
+
+          setOrderMsg({ type: 'success', text: `${side === 'buy' ? 'Long' : 'Short'} position opened — ${results.join('  ')}` });
+        }
+      }
+
       fetchAll();
     } catch (e: any) {
       setOrderMsg({ type: 'error', text: e.response?.data?.message ?? e.message ?? 'Order failed' });
