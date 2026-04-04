@@ -192,6 +192,16 @@ export const apiService = {
     apiClient.get(`/api/websocket/data/futures/${contractSymbol}/range`, { params: { since } }),
   getAllSpotMarkets: () => apiClient.get('/api/websocket/data/spot/markets'),
   getAllFuturesContracts: () => apiClient.get('/api/websocket/data/futures/contracts'),
+
+  // Candlestick chart APIs
+  getSpotCandlesticks: (symbol: string, interval: string, limit: number) =>
+    apiClient.get(`/api/websocket/spot-candlestick/symbol/${encodeURIComponent(symbol)}/interval/${encodeURIComponent(interval)}`, { params: { limit } }),
+  getFuturesCandlesticks: (pair: string, duration: string, limit: number) =>
+    apiClient.get(`/api/websocket/futures-candlestick/pair/${encodeURIComponent(pair)}/duration/${encodeURIComponent(duration)}/limit/${limit}`),
+  getSpotCandlestickIntervals: (symbol: string) =>
+    apiClient.get(`/api/websocket/spot-candlestick/symbol/${encodeURIComponent(symbol)}/intervals`),
+  getFuturesCandlestickDurations: () =>
+    apiClient.get('/api/websocket/futures-candlestick/metadata/durations'),
 };
 
 export default apiClient;
