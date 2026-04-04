@@ -43,7 +43,6 @@ const MarketPage: React.FC = () => {
   // Fetch list of spot markets
   const fetchMarkets = async () => {
     try {
-<<<<<<< HEAD
       const [spotResponse] = await Promise.all([
         apiService.getAllSpotMarkets(),
         apiService.getAllFuturesContracts()
@@ -57,10 +56,6 @@ const MarketPage: React.FC = () => {
       if (!spotResponse.data || spotResponse.data.length === 0) {
         setLoading(false);
       }
-=======
-      const spotResponse = await apiService.getAllSpotMarkets();
-      setSpotMarkets(spotResponse.data || []);
->>>>>>> 84333d70095238b68805b30cb677b4043c137ddf
     } catch (err: any) {
       console.error('Error fetching spot markets:', err);
       setError(err.response?.data?.message || 'Failed to fetch markets list');
@@ -159,7 +154,6 @@ const MarketPage: React.FC = () => {
     }
     return spotMarkets
       .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
-<<<<<<< HEAD
       .map(market => {
         const data = dataMap.get(market);
         // For futures, always return a market entry even if no data yet
@@ -175,9 +169,6 @@ const MarketPage: React.FC = () => {
         }
         return data;
       })
-=======
-      .map(market => spotData.get(market))
->>>>>>> 84333d70095238b68805b30cb677b4043c137ddf
       .filter(data => data !== undefined) as MarketData[];
   };
 
@@ -274,7 +265,6 @@ const MarketPage: React.FC = () => {
           const hasData = displayPrice > 0 || high > 0 || volume > 0;
           
           return (
-<<<<<<< HEAD
             <div 
               key={data.market} 
               className="ticker-card" 
@@ -292,13 +282,6 @@ const MarketPage: React.FC = () => {
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = '';
               }}
-=======
-            <div
-              key={data.market}
-              className="ticker-card"
-              onClick={() => navigate(`/chart/${activeTab}/${encodeURIComponent(data.market)}`)}
-              style={{ cursor: 'pointer' }}
->>>>>>> 84333d70095238b68805b30cb677b4043c137ddf
             >
               <div className="ticker-header">
                 <h3>{data.market}</h3>
@@ -312,18 +295,11 @@ const MarketPage: React.FC = () => {
               </div>
               
               <div className="ticker-price">
-<<<<<<< HEAD
                 {hasData ? (
                   `₹${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
                 ) : (
                   <span style={{ color: '#94a3b8' }}>--</span>
                 )}
-=======
-                {data.price
-                  ? `\u20b9${parseFloat(data.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
-                  : <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Awaiting data…</span>
-                }
->>>>>>> 84333d70095238b68805b30cb677b4043c137ddf
               </div>
               
               <div className="ticker-details">
