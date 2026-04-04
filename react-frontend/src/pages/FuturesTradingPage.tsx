@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const FUTURES_CONTRACTS = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT'];
+const FUTURES_CONTRACTS = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-GOAT_USDT', 'B-TIA_USDT', 'B-PENDLE_USDT', 'B-LUNA2_USDT', 'B-COMP_USDT', 'B-1000FLOKI_USDT', 'B-KAS_USDT', 'B-ZK_USDT', 'B-AVA_USDT', 'B-STX_USDT', 'B-MOODENG_USDT', 'B-VINE_USDT', 'B-APT_USDT', 'B-BNB_USDT', 'B-AR_USDT', 'B-LINK_USDT', 'B-MANA_USDT', 'B-MEW_USDT'];
 
 type OrderSide = 'buy' | 'sell';
 type OrderType = 'market' | 'limit';
@@ -1020,7 +1020,7 @@ const FuturesTradingPage: React.FC = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #334155' }}>
-                      {['Contract', 'Side', 'Type', 'Price', 'Quantity', 'Status', ''].map(h => (
+                      {['Contract', 'Side', 'Type', 'Price', 'Quantity', 'Target', 'Status', ''].map(h => (
                         <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {h}
                         </th>
@@ -1033,6 +1033,7 @@ const FuturesTradingPage: React.FC = () => {
                       const orderId = order.id ?? order.orderId ?? order.order_id ?? '';
                       const market = order.market ?? order.pair ?? '—';
                       const orderType = order.order_type ?? order.orderType ?? '—';
+                      const targetPrice = order.stop_price || order.stopPrice || order.take_profit_price || order.takeProfitPrice || order.price;
                       return (
                         <tr key={orderId || idx} style={{ borderBottom: '1px solid #1e293b' }}>
                           <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600 }}>{market}</td>
@@ -1043,7 +1044,8 @@ const FuturesTradingPage: React.FC = () => {
                             {String(orderType).replace(/_/g, ' ')}
                           </td>
                           <td style={{ padding: '0.6rem 0.75rem' }}>${fmt(order.price)}</td>
-                          <td style={{ padding: '0.6rem 0.75rem' }}>{fmt(order.quantity, 4)}</td>
+                          <td style={{ padding: '0.6rem 0.75rem' }}>{fmt(order.total_quantity || order.totalQuantity, 4)}</td>
+                          <td style={{ padding: '0.6rem 0.75rem' }}>${fmt(targetPrice)}</td>
                           <td style={{ padding: '0.6rem 0.75rem' }}>
                             <span style={{
                               padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.72rem',

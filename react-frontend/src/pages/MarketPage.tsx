@@ -19,7 +19,13 @@ interface MarketData {
 }
 
 // Restricted futures symbols to monitor
-const ALLOWED_FUTURES = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-SPX_USDT'];
+const ALLOWED_FUTURES = [
+  'B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-GOAT_USDT',
+  'B-TIA_USDT', 'B-PENDLE_USDT', 'B-LUNA2_USDT', 'B-COMP_USDT', 'B-1000FLOKI_USDT',
+  'B-KAS_USDT', 'B-ZK_USDT', 'B-AVA_USDT', 'B-STX_USDT', 'B-MOODENG_USDT',
+  'B-VINE_USDT', 'B-APT_USDT', 'B-BNB_USDT', 'B-AR_USDT', 'B-LINK_USDT',
+  'B-MANA_USDT', 'B-MEW_USDT'
+];
 
 const MarketPage: React.FC = () => {
   const navigate = useNavigate();
