@@ -12,7 +12,8 @@ import {
   LogOut,
   Key,
   Wifi,
-  Settings2
+  Settings2,
+  ClipboardList
 } from 'lucide-react';
 
 const Header: React.FC = () => {
@@ -47,6 +48,11 @@ const Header: React.FC = () => {
               <Link to="/futures" className={isActive('/futures') ? 'nav-link active' : 'nav-link'}>
                 <BarChart3 size={18} />
                 <span>Futures</span>
+              </Link>
+              
+              <Link to="/trade-log" className={isActive('/trade-log') ? 'nav-link active' : 'nav-link'}>
+                <ClipboardList size={18} />
+                <span>Trade Log</span>
               </Link>
               
               <Link to="/margin" className={isActive('/margin') ? 'nav-link active' : 'nav-link'}>

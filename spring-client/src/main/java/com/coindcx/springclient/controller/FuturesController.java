@@ -263,13 +263,13 @@ public class FuturesController {
     @PostMapping("/positions/exit")
     public ResponseEntity<Object> exitPosition(@RequestBody Map<String, Object> body) {
         try {
+            String pair = body.containsKey("market") ? (String) body.get("market")
+                    : (String) body.get("pair");
             // Resolve position id
             String positionId = null;
             if (body.containsKey("position_id") && body.get("position_id") != null) {
                 positionId = body.get("position_id").toString();
             } else {
-                String pair = body.containsKey("market") ? (String) body.get("market")
-                        : (String) body.get("pair");
                 if (pair != null && !pair.isBlank()) {
                     positionId = futuresService.fetchActivePositionId(pair);
                 }
@@ -287,7 +287,7 @@ public class FuturesController {
             request.setTimestamp(System.currentTimeMillis());
             request.setId(positionId);
 
-            ExchangeV1DerivativesFuturesPositionsExitPost200Response response = futuresService.exitPosition(request);
+            ExchangeV1DerivativesFuturesPositionsExitPost200Response response = futuresService.exitPosition(request, pair);
             return ResponseEntity.ok(response);
         } catch (ApiException e) {
             return ResponseEntity.status(e.getCode())
@@ -308,13 +308,13 @@ public class FuturesController {
     @PostMapping("/positions/create-tpsl")
     public ResponseEntity<String> createTpSl(@RequestBody Map<String, Object> body) {
         try {
+            String pair = body.containsKey("market") ? (String) body.get("market")
+                    : (String) body.get("pair");
             // Resolve position id
             String positionId = null;
             if (body.containsKey("position_id") && body.get("position_id") != null) {
                 positionId = body.get("position_id").toString();
             } else {
-                String pair = body.containsKey("market") ? (String) body.get("market")
-                        : (String) body.get("pair");
                 if (pair != null && !pair.isBlank()) {
                     positionId = futuresService.fetchActivePositionId(pair);
                 }
@@ -358,7 +358,7 @@ public class FuturesController {
                         .body("{\"error\":\"At least one of 'target_price' (TP) or 'stop_loss' (SL) must be provided\"}");
             }
 
-            futuresService.createTpSl(req);
+            futuresService.createTpSl(req, pair);
             return ResponseEntity.ok("{\"message\":\"TP/SL created successfully\"}");
         } catch (ApiException e) {
             int status = e.getCode() > 0 ? e.getCode() : 500;

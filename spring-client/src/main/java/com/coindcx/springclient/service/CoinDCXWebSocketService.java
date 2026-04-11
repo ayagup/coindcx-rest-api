@@ -251,6 +251,16 @@ public class CoinDCXWebSocketService {
                     WebSocketChannels.EVENT_TRADE_UPDATE,
                     true
                 );
+                subscribeToPrivateChannel(
+                    WebSocketChannels.CHANNEL_PRIVATE_COINDCX,
+                    WebSocketChannels.EVENT_FUTURES_POSITION_UPDATE,
+                    true
+                );
+                subscribeToPrivateChannel(
+                    WebSocketChannels.CHANNEL_PRIVATE_COINDCX,
+                    WebSocketChannels.EVENT_FUTURES_ORDER_UPDATE,
+                    true
+                );
 
                 subscribeToPrivateChannel(
                     WebSocketChannels.CHANNEL_PRIVATE_FUTURES_BTC_NEW_TRADES,

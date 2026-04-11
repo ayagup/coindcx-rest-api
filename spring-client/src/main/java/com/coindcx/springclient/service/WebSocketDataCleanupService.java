@@ -20,6 +20,7 @@ import com.coindcx.springclient.repository.WebSocketFuturesNewTradeDataRepositor
 import com.coindcx.springclient.repository.WebSocketFuturesInstrumentPriceRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesDataRepository;
 import com.coindcx.springclient.repository.WebSocketSpotDataRepository;
+import com.coindcx.springclient.repository.FuturesTradeLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,7 @@ public class WebSocketDataCleanupService {
     private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
     private final WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository;
     private final WebSocketFuturesInstrumentPriceRepository futuresInstrumentPriceRepository;
+    private final FuturesTradeLogRepository futuresTradeLogRepository;
 
     @Value("${websocket.data.retention.days:7}")
     private int retentionDays;
@@ -81,7 +83,8 @@ public class WebSocketDataCleanupService {
             WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository,
             WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
             WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository,
-            WebSocketFuturesInstrumentPriceRepository futuresInstrumentPriceRepository) {
+            WebSocketFuturesInstrumentPriceRepository futuresInstrumentPriceRepository,
+            FuturesTradeLogRepository futuresTradeLogRepository) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
         this.spotBalanceDataRepository = spotBalanceDataRepository;
@@ -102,6 +105,7 @@ public class WebSocketDataCleanupService {
         this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
         this.futuresNewTradeDataRepository = futuresNewTradeDataRepository;
         this.futuresInstrumentPriceRepository = futuresInstrumentPriceRepository;
+        this.futuresTradeLogRepository = futuresTradeLogRepository;
     }
 
     /**
@@ -136,6 +140,7 @@ public class WebSocketDataCleanupService {
             long futuresCurrentPricesCountBefore = futuresCurrentPricesDataRepository.count();
             long futuresNewTradeCountBefore = futuresNewTradeDataRepository.count();
             long futuresInstrumentPriceCountBefore = futuresInstrumentPriceRepository.count();
+            long futuresTradeLogCountBefore = futuresTradeLogRepository.count();
             
             // Delete old spot data
             spotDataRepository.deleteByTimestampBefore(cutoff);
@@ -196,6 +201,9 @@ public class WebSocketDataCleanupService {
             
             // Delete old futures instrument price data
             futuresInstrumentPriceRepository.deleteOldRecords(cutoff);
+
+            // Delete old futures trade log data
+            futuresTradeLogRepository.deleteByRecordTimestampBefore(cutoff);
             
             long spotCountAfter = spotDataRepository.count();
             long futuresCountAfter = futuresDataRepository.count();
@@ -217,6 +225,7 @@ public class WebSocketDataCleanupService {
             long futuresCurrentPricesCountAfter = futuresCurrentPricesDataRepository.count();
             long futuresNewTradeCountAfter = futuresNewTradeDataRepository.count();
             long futuresInstrumentPriceCountAfter = futuresInstrumentPriceRepository.count();
+            long futuresTradeLogCountAfter = futuresTradeLogRepository.count();
             
             long spotDeleted = spotCountBefore - spotCountAfter;
             long futuresDeleted = futuresCountBefore - futuresCountAfter;

@@ -32,10 +32,12 @@ public class FuturesService {
     private static final Logger logger = LoggerFactory.getLogger(FuturesService.class);
 
     private final FuturesApi futuresApi;
+    private final FuturesTradeLogService futuresTradeLogService;
 
     @Autowired
-    public FuturesService(WebSocketConfig config) {
+    public FuturesService(WebSocketConfig config, FuturesTradeLogService futuresTradeLogService) {
         this.futuresApi = new FuturesApi();
+        this.futuresTradeLogService = futuresTradeLogService;
         // X-AUTH-APIKEY – static value, set once
         ApiKeyAuth apiKeyAuth = (ApiKeyAuth) futuresApi.getApiClient().getAuthentication("ApiKeyAuth");
         apiKeyAuth.setApiKey(config.getApiKey());
@@ -47,6 +49,7 @@ public class FuturesService {
     /** Testing constructor **/
     public FuturesService(FuturesApi futuresApi) {
         this.futuresApi = futuresApi;
+        this.futuresTradeLogService = null;
     }
 
     /**
@@ -142,6 +145,9 @@ public class FuturesService {
                 throw new ApiException(response.code(),
                         "Order creation failed (HTTP " + response.code() + "): " + responseBody);
             }
+            if (futuresTradeLogService != null) {
+                futuresTradeLogService.logApiOrderSubmission(request, responseBody);
+            }
             return responseBody.isEmpty() ? "{\"status\":\"ok\"}" : responseBody;
         } catch (IOException e) {
             throw new ApiException("IO error calling create order: " + e.getMessage());
@@ -210,7 +216,18 @@ public class FuturesService {
      * @throws ApiException if the API call fails
      */
     public ExchangeV1DerivativesFuturesPositionsExitPost200Response exitPosition(ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest request) throws ApiException {
-        return futuresApi.exchangeV1DerivativesFuturesPositionsExitPost(request);
+        return exitPosition(request, null);
+    }
+
+    public ExchangeV1DerivativesFuturesPositionsExitPost200Response exitPosition(
+            ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest request,
+            String pair) throws ApiException {
+        ExchangeV1DerivativesFuturesPositionsExitPost200Response response =
+                futuresApi.exchangeV1DerivativesFuturesPositionsExitPost(request);
+        if (futuresTradeLogService != null) {
+            futuresTradeLogService.logApiPositionCloseRequest(request, pair, response);
+        }
+        return response;
     }
 
     /**
@@ -219,7 +236,14 @@ public class FuturesService {
      * @throws ApiException if the API call fails
      */
     public void createTpSl(ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest request) throws ApiException {
+        createTpSl(request, null);
+    }
+
+    public void createTpSl(ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest request, String pair) throws ApiException {
         futuresApi.exchangeV1DerivativesFuturesPositionsCreateTpslPost(request);
+        if (futuresTradeLogService != null) {
+            futuresTradeLogService.logApiTpSlRequest(request, pair);
+        }
     }
 
     /**

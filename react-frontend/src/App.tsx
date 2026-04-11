@@ -9,6 +9,7 @@ import WebSocketPage from './pages/WebSocketPage';
 import ChartPage from './pages/ChartPage';
 import FuturesTradingPage from './pages/FuturesTradingPage';
 import TradeConfigPage from './pages/TradeConfigPage';
+import TradeLogPage from './pages/TradeLogPage';
 import './App.css';
 
 // Protected Route Component
@@ -36,6 +37,7 @@ const AppRoutes: React.FC = () => {
           />
           <Route path="/futures" element={<FuturesTradingPage />} />
           <Route path="/trade-config" element={<TradeConfigPage />} />
+          <Route path="/trade-log" element={<TradeLogPage />} />
           <Route
             path="/margin"
             element={

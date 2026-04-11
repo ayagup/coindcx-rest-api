@@ -193,6 +193,16 @@ export const apiService = {
   getAllSpotMarkets: () => apiClient.get('/api/websocket/data/spot/markets'),
   getAllFuturesContracts: () => apiClient.get('/api/websocket/data/futures/contracts'),
 
+  // Futures Trade Log APIs (no auth required — read-only append-only log)
+  getTradeLogRecent: (limit = 50) => publicApiClient.get(`/api/futures/trade-log/recent?limit=${limit}`),
+  getTradeLogAll: () => publicApiClient.get('/api/futures/trade-log/all'),
+  getTradeLogById: (id: number) => publicApiClient.get(`/api/futures/trade-log/${id}`),
+  getTradeLogStats: () => publicApiClient.get('/api/futures/trade-log/stats'),
+  getTradeLogByPair: (pair: string) => publicApiClient.get(`/api/futures/trade-log/pair/${encodeURIComponent(pair)}`),
+  getTradeLogByEventType: (eventType: string) => publicApiClient.get(`/api/futures/trade-log/event-type/${encodeURIComponent(eventType)}`),
+  getTradeLogByPositionId: (positionId: string) => publicApiClient.get(`/api/futures/trade-log/position/${encodeURIComponent(positionId)}`),
+  getTradeLogByOrderId: (orderId: string) => publicApiClient.get(`/api/futures/trade-log/order/${encodeURIComponent(orderId)}`),
+
   // Candlestick chart APIs
   getSpotCandlesticks: (symbol: string, interval: string, limit: number) =>
     apiClient.get(`/api/websocket/spot-candlestick/symbol/${encodeURIComponent(symbol)}/interval/${encodeURIComponent(interval)}`, { params: { limit } }),

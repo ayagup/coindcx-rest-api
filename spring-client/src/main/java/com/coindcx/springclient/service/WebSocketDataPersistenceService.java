@@ -79,6 +79,7 @@ public class WebSocketDataPersistenceService {
     private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
     private final WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository;
     private final FuturesInstrumentPriceParsingService instrumentPriceParsingService;
+    private final FuturesTradeLogService futuresTradeLogService;
     private final Gson gson;
 
     public WebSocketDataPersistenceService(
@@ -101,7 +102,8 @@ public class WebSocketDataPersistenceService {
             WebSocketFuturesOrderbookDataRepository futuresOrderbookDataRepository,
             WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
             WebSocketFuturesNewTradeDataRepository futuresNewTradeDataRepository,
-            FuturesInstrumentPriceParsingService instrumentPriceParsingService) {
+            FuturesInstrumentPriceParsingService instrumentPriceParsingService,
+            FuturesTradeLogService futuresTradeLogService) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
         this.spotBalanceDataRepository = spotBalanceDataRepository;
@@ -122,6 +124,7 @@ public class WebSocketDataPersistenceService {
         this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
         this.futuresNewTradeDataRepository = futuresNewTradeDataRepository;
         this.instrumentPriceParsingService = instrumentPriceParsingService;
+        this.futuresTradeLogService = futuresTradeLogService;
         this.gson = new Gson();
     }
 
@@ -1286,7 +1289,14 @@ public class WebSocketDataPersistenceService {
                     positionData.setChannelName(channelName);
                     
                     parseFuturesPositionUpdateData(positionData, positionJson);
+                    WebSocketFuturesPositionUpdateData previousPositionData = null;
+                    if (positionData.getPositionId() != null && !positionData.getPositionId().isBlank()) {
+                        previousPositionData = futuresPositionUpdateDataRepository
+                                .findFirstByPositionIdOrderByUpdateTimestampDesc(positionData.getPositionId())
+                                .orElse(null);
+                    }
                     futuresPositionUpdateDataRepository.save(positionData);
+                    futuresTradeLogService.recordPositionLifecycle(positionData, previousPositionData);
                     logger.debug("Saved futures position update data for position: {}, pair: {}, side: {}, pnl: {}", 
                         positionData.getPositionId(), positionData.getPair(), 
                         positionData.getSide(), positionData.getTotalPnl());
@@ -1432,7 +1442,14 @@ public class WebSocketDataPersistenceService {
                     orderData.setChannelName(channelName);
                     
                     parseFuturesOrderUpdateData(orderData, orderJson);
+                    WebSocketFuturesOrderUpdateData previousOrderData = null;
+                    if (orderData.getOrderId() != null && !orderData.getOrderId().isBlank()) {
+                        previousOrderData = futuresOrderUpdateDataRepository
+                                .findFirstByOrderIdOrderByUpdatedAtDesc(orderData.getOrderId())
+                                .orElse(null);
+                    }
                     futuresOrderUpdateDataRepository.save(orderData);
+                    futuresTradeLogService.recordOrderLifecycle(orderData, previousOrderData);
                     logger.debug("Saved futures order update data for order: {}, pair: {}, status: {}, type: {}", 
                         orderData.getOrderId(), orderData.getPair(), 
                         orderData.getStatus(), orderData.getOrderType());

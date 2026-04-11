@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { apiService } from '../services/api';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
-import { TrendingUp, TrendingDown, RefreshCw, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Zap, ClipboardList } from 'lucide-react';
 
 type MarketType = 'spot' | 'futures';
 
@@ -194,10 +194,16 @@ const MarketPage: React.FC = () => {
     <div className="page">
       <div className="page-header">
         <h1>Market Data (WebSocket Storage)</h1>
-        <button onClick={handleRefresh} className="btn btn-secondary" disabled={loading}>
-          <RefreshCw size={18} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Link to="/trade-log" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+            <ClipboardList size={18} />
+            Trade Log
+          </Link>
+          <button onClick={handleRefresh} className="btn btn-secondary" disabled={loading}>
+            <RefreshCw size={18} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
