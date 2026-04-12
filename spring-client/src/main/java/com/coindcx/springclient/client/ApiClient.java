@@ -55,6 +55,7 @@ import com.coindcx.springclient.client.auth.Authentication;
 import com.coindcx.springclient.client.auth.HttpBasicAuth;
 import com.coindcx.springclient.client.auth.HttpBearerAuth;
 import com.coindcx.springclient.client.auth.ApiKeyAuth;
+import com.coindcx.springclient.client.auth.HmacSignatureAuth;
 
 /**
  * <p>ApiClient class.</p>
@@ -106,7 +107,7 @@ public class ApiClient {
 
         // Setup authentications (key: authentication name, value: authentication).
         authentications.put("ApiKeyAuth", new ApiKeyAuth("header", "X-AUTH-APIKEY"));
-        authentications.put("SignatureAuth", new ApiKeyAuth("header", "X-AUTH-SIGNATURE"));
+        authentications.put("SignatureAuth", new HmacSignatureAuth());
         // Prevent the authentications from being modified.
         authentications = Collections.unmodifiableMap(authentications);
     }
@@ -123,7 +124,7 @@ public class ApiClient {
 
         // Setup authentications (key: authentication name, value: authentication).
         authentications.put("ApiKeyAuth", new ApiKeyAuth("header", "X-AUTH-APIKEY"));
-        authentications.put("SignatureAuth", new ApiKeyAuth("header", "X-AUTH-SIGNATURE"));
+        authentications.put("SignatureAuth", new HmacSignatureAuth());
         // Prevent the authentications from being modified.
         authentications = Collections.unmodifiableMap(authentications);
     }
@@ -134,7 +135,7 @@ public class ApiClient {
         
         // 2. Set the desired logging level
         // Options: NONE, BASIC, HEADERS, BODY
-        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BASIC);
+        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
 
         initHttpClient(Collections.singletonList(loggingInterceptor));
     }

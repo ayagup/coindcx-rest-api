@@ -1,14 +1,14 @@
 package com.coindcx.springclient.controller;
 
 import com.coindcx.springclient.entity.WebSocketFuturesData;
+import com.coindcx.springclient.entity.WebSocketFuturesInstrumentPrice;
 import com.coindcx.springclient.entity.WebSocketSpotData;
-import com.coindcx.springclient.model.WebSocketFuturesCurrentPricesData;
-import com.coindcx.springclient.repository.WebSocketFuturesCurrentPricesDataRepository;
+import com.coindcx.springclient.model.WebSocketFuturesCandlestickData;
+import com.coindcx.springclient.repository.WebSocketFuturesCandlestickDataRepository;
 import com.coindcx.springclient.repository.WebSocketFuturesDataRepository;
 import com.coindcx.springclient.repository.WebSocketSpotDataRepository;
 import com.coindcx.springclient.service.CoinDCXWebSocketService;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.coindcx.springclient.service.FuturesInstrumentPriceParsingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -29,21 +29,42 @@ import java.util.Optional;
 @RequestMapping("/api/websocket/data")
 public class WebSocketDataController {
 
+    /**
+     * Maps user-facing timeframe labels to the 'duration' value stored in
+     * websocket_futures_candlestick_data.
+     */
+    private static final Map<String, String> TIMEFRAME_TO_DURATION = new HashMap<>();
+    static {
+        TIMEFRAME_TO_DURATION.put("1m",  "1");
+        TIMEFRAME_TO_DURATION.put("3m",  "3");
+        TIMEFRAME_TO_DURATION.put("5m",  "5");
+        TIMEFRAME_TO_DURATION.put("15m", "15");
+        TIMEFRAME_TO_DURATION.put("30m", "30");
+        TIMEFRAME_TO_DURATION.put("1h",  "60");
+        TIMEFRAME_TO_DURATION.put("2h",  "120");
+        TIMEFRAME_TO_DURATION.put("4h",  "240");
+        TIMEFRAME_TO_DURATION.put("1d",  "1D");
+        TIMEFRAME_TO_DURATION.put("1w",  "1W");
+    }
+
     private final WebSocketSpotDataRepository spotDataRepository;
     private final WebSocketFuturesDataRepository futuresDataRepository;
-    private final WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository;
+    private final WebSocketFuturesCandlestickDataRepository candlestickRepository;
     private final CoinDCXWebSocketService webSocketService;
+    private final FuturesInstrumentPriceParsingService futuresInstrumentPriceParsingService;
 
     @Autowired
     public WebSocketDataController(
             WebSocketSpotDataRepository spotDataRepository,
             WebSocketFuturesDataRepository futuresDataRepository,
-            WebSocketFuturesCurrentPricesDataRepository futuresCurrentPricesDataRepository,
-            CoinDCXWebSocketService webSocketService) {
+            WebSocketFuturesCandlestickDataRepository candlestickRepository,
+            CoinDCXWebSocketService webSocketService,
+            FuturesInstrumentPriceParsingService futuresInstrumentPriceParsingService) {
         this.spotDataRepository = spotDataRepository;
         this.futuresDataRepository = futuresDataRepository;
-        this.futuresCurrentPricesDataRepository = futuresCurrentPricesDataRepository;
+        this.candlestickRepository = candlestickRepository;
         this.webSocketService = webSocketService;
+        this.futuresInstrumentPriceParsingService = futuresInstrumentPriceParsingService;
     }
 
     /**
@@ -86,21 +107,48 @@ public class WebSocketDataController {
     }
 
     /**
-     * Get recent futures market data
+     * Get recent futures market data.
+     *
+     * When {@code timeframe} is supplied (e.g. "1m", "5m", "1h", "1d", "1w") the response
+     * contains OHLCV candlestick rows from websocket_futures_candlestick_data ordered by
+     * open_time DESC.
+     *
+     * Supported timeframes: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1w
+     *
+     * Without {@code timeframe} the original behaviour is preserved: mark-price events are
+     * returned, falling back to currentPrices@futures@rt instrument prices.
      */
     @GetMapping("/futures/{contractSymbol}")
-    public ResponseEntity<List<WebSocketFuturesData>> getFuturesData(
+    public ResponseEntity<List<?>> getFuturesData(
             @PathVariable String contractSymbol,
-            @RequestParam(defaultValue = "100") int limit) {
-        
-        List<WebSocketFuturesData> data = futuresDataRepository.findByContractSymbolOrderByTimestampDesc(contractSymbol);
-        
-        // Limit results
-        if (data.size() > limit) {
-            data = data.subList(0, limit);
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) String timeframe) {
+
+        // ── Candlestick path ──────────────────────────────────────────────────
+        if (timeframe != null && !timeframe.isBlank()) {
+            String duration = TIMEFRAME_TO_DURATION.get(timeframe.toLowerCase());
+            if (duration == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            List<WebSocketFuturesCandlestickData> candles =
+                    candlestickRepository.findByPairAndDurationWithLimit(contractSymbol, duration, limit);
+            return ResponseEntity.ok(candles);
         }
-        
-        return ResponseEntity.ok(data);
+
+        // ── Legacy mark-price path ────────────────────────────────────────────
+        List<WebSocketFuturesData> data = futuresDataRepository.findByContractSymbolOrderByTimestampDesc(contractSymbol);
+
+        if (!data.isEmpty()) {
+            if (data.size() > limit) {
+                data = data.subList(0, limit);
+            }
+            return ResponseEntity.ok(data);
+        }
+
+        // Fallback: instrument price data from currentPrices@futures@rt channel
+        List<WebSocketFuturesInstrumentPrice> instrumentPrices =
+                futuresInstrumentPriceParsingService.getRecentPrices(contractSymbol, limit);
+        return ResponseEntity.ok(instrumentPrices);
     }
 
     /**
@@ -157,63 +205,26 @@ public class WebSocketDataController {
 
     /**
      * Get latest mark price for a futures contract.
-     * First checks WebSocketFuturesData; falls back to the live
-     * currentPrices@futures#update snapshot (keys stored as e.g. "B-BTC_USDT").
-     * Also accepts short-form symbols like "BTCUSDT" by normalising the key.
+     * First tries WebSocketFuturesData (mark-price events), then falls back
+     * to WebSocketFuturesInstrumentPrice (currentPrices@futures@rt channel).
      */
     @GetMapping("/futures/{contractSymbol}/latest-price")
-    public ResponseEntity<WebSocketFuturesData> getLatestFuturesPrice(@PathVariable String contractSymbol) {
+    public ResponseEntity<?> getLatestFuturesPrice(@PathVariable String contractSymbol) {
         WebSocketFuturesData data = futuresDataRepository.findLatestMarkPrice(contractSymbol);
+
         if (data != null) {
             return ResponseEntity.ok(data);
         }
 
-        // Fall back to the live current-prices snapshot
-        Optional<WebSocketFuturesCurrentPricesData> latestSnapshot =
-                futuresCurrentPricesDataRepository.findLatestByRecordTimestamp();
-        if (latestSnapshot.isEmpty() || latestSnapshot.get().getPrices() == null) {
-            return ResponseEntity.notFound().build();
+        // Fallback: instrument price data from currentPrices@futures@rt channel
+        WebSocketFuturesInstrumentPrice instrumentPrice =
+                futuresInstrumentPriceParsingService.getLatestPrice(contractSymbol);
+
+        if (instrumentPrice != null) {
+            return ResponseEntity.ok(instrumentPrice);
         }
 
-        try {
-            JsonObject prices = JsonParser.parseString(latestSnapshot.get().getPrices()).getAsJsonObject();
-
-            // Try exact match first (e.g. "B-BTC_USDT"), then normalised match (e.g. "BTCUSDT")
-            String matchedKey = null;
-            if (prices.has(contractSymbol)) {
-                matchedKey = contractSymbol;
-            } else {
-                for (String key : prices.keySet()) {
-                    String normalised = key.replaceFirst("^B-", "").replace("_", "");
-                    if (normalised.equalsIgnoreCase(contractSymbol)) {
-                        matchedKey = key;
-                        break;
-                    }
-                }
-            }
-
-            if (matchedKey == null || !prices.get(matchedKey).isJsonObject()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            JsonObject priceEntry = prices.getAsJsonObject(matchedKey);
-            if (!priceEntry.has("mp") || priceEntry.get("mp").isJsonNull()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            WebSocketFuturesData syntheticData = new WebSocketFuturesData();
-            syntheticData.setContractSymbol(contractSymbol);
-            syntheticData.setChannelName("currentPrices@futures@rt");
-            syntheticData.setEventType("price-change");
-            syntheticData.setMarkPrice(priceEntry.get("mp").getAsBigDecimal());
-            syntheticData.setTimestamp(LocalDateTime.now());
-            if (latestSnapshot.get().getTimestamp() != null) {
-                syntheticData.setExchangeTimestamp(latestSnapshot.get().getTimestamp());
-            }
-            return ResponseEntity.ok(syntheticData);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.notFound().build();
     }
 
     /**

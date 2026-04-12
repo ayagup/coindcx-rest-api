@@ -4,6 +4,8 @@ import com.coindcx.springclient.dao.ApiCallLogDao;
 import com.coindcx.springclient.dto.ApiCallStatistics;
 import com.coindcx.springclient.entity.ApiCallLog;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -24,8 +26,17 @@ public class ApiCallLogService {
     }
 
     /**
-     * Get all API call logs
+     * Get all API call logs with pagination
      */
+    public Page<ApiCallLog> getAllLogs(Pageable pageable) {
+        return apiCallLogDao.findAll(pageable);
+    }
+
+    /**
+     * Get all API call logs (non-paginated)
+     * @deprecated Use getAllLogs(Pageable) instead for better performance with large datasets
+     */
+    @Deprecated
     public List<ApiCallLog> getAllLogs() {
         return apiCallLogDao.findAll();
     }

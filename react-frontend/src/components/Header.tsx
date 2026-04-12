@@ -11,7 +11,9 @@ import {
   Activity,
   LogOut,
   Key,
-  Wifi
+  Wifi,
+  Settings2,
+  ClipboardList
 } from 'lucide-react';
 
 const Header: React.FC = () => {
@@ -48,6 +50,11 @@ const Header: React.FC = () => {
                 <span>Futures</span>
               </Link>
               
+              <Link to="/trade-log" className={isActive('/trade-log') ? 'nav-link active' : 'nav-link'}>
+                <ClipboardList size={18} />
+                <span>Trade Log</span>
+              </Link>
+              
               <Link to="/margin" className={isActive('/margin') ? 'nav-link active' : 'nav-link'}>
                 <Activity size={18} />
                 <span>Margin</span>
@@ -65,6 +72,11 @@ const Header: React.FC = () => {
             </>
           )}
           
+          <Link to="/trade-config" className={isActive('/trade-config') ? 'nav-link active' : 'nav-link'}>
+            <Settings2 size={18} />
+            <span>Config</span>
+          </Link>
+
           <Link to="/websocket" className={isActive('/websocket') ? 'nav-link active' : 'nav-link'}>
             <Wifi size={18} />
             <span>WebSocket</span>

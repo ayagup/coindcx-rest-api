@@ -48,6 +48,10 @@
             "description": "APIs for futures/derivatives trading operations"
         },
         {
+            "name": "Futures Trade Log",
+            "description": "Read access to the append-only futures trade lifecycle log"
+        },
+        {
             "name": "Wallet Management",
             "description": "APIs for wallet and fund transfer operations"
         },
@@ -1600,7 +1604,10 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsCancelAllOpenOrdersForPositionPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1612,7 +1619,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsExitPost200Response"
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1638,7 +1645,10 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1790,7 +1800,10 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesOrdersCreatePostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -13984,6 +13997,272 @@
                 }
             }
         },
+        "/api/websocket/futures-instrument-prices/statistics": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getStatistics_4",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/search": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "searchInstruments",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/latest-all": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getLatestPricesAllInstruments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/WebSocketFuturesInstrumentPrice"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/instruments": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getAllInstruments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/instrument/{instrument}": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getInstrumentPrices",
+                "parameters": [
+                    {
+                        "name": "instrument",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/WebSocketFuturesInstrumentPrice"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/instrument/{instrument}/time-range": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getPricesByTimeRange",
+                "parameters": [
+                    {
+                        "name": "instrument",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "startTime",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "endTime",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/WebSocketFuturesInstrumentPrice"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/instrument/{instrument}/price-change": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getPriceChangeSummary",
+                "parameters": [
+                    {
+                        "name": "instrument",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/futures-instrument-prices/instrument/{instrument}/latest": {
+            "get": {
+                "tags": [
+                    "web-socket-futures-instrument-price-controller"
+                ],
+                "operationId": "getLatestPrice",
+                "parameters": [
+                    {
+                        "name": "instrument",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/websocket/futures-current-prices": {
             "get": {
                 "tags": [
@@ -14101,7 +14380,7 @@
                 "tags": [
                     "web-socket-futures-current-prices-controller"
                 ],
-                "operationId": "getPricesByTimeRange",
+                "operationId": "getPricesByTimeRange_1",
                 "parameters": [
                     {
                         "name": "startTime",
@@ -14144,7 +14423,7 @@
                 "tags": [
                     "web-socket-futures-current-prices-controller"
                 ],
-                "operationId": "getStatistics_4",
+                "operationId": "getStatistics_5",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -14785,7 +15064,7 @@
                 "tags": [
                     "web-socket-futures-candlestick-controller"
                 ],
-                "operationId": "getStatistics_5",
+                "operationId": "getStatistics_6",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -16346,6 +16625,14 @@
                             "format": "int32",
                             "default": 100
                         }
+                    },
+                    {
+                        "name": "timeframe",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -16356,7 +16643,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/WebSocketFuturesData"
+                                        "type": "object"
                                     }
                                 }
                             }
@@ -16429,7 +16716,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/WebSocketFuturesData"
+                                    "type": "object"
                                 }
                             }
                         }
@@ -16647,7 +16934,7 @@
                 "tags": [
                     "web-socket-balance-update-controller"
                 ],
-                "operationId": "getStatistics_6",
+                "operationId": "getStatistics_7",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -17718,17 +18005,53 @@
                 "tags": [
                     "API Monitoring"
                 ],
+                "summary": "Get all API call logs with pagination",
+                "description": "Returns paginated API call logs. Default page=0, size=20, sorted by timestamp descending",
                 "operationId": "getAllLogs",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "size",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 20
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": [
+                                "timestamp",
+                                "desc"
+                            ]
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/ApiCallLog"
-                                    }
+                                    "$ref": "#/components/schemas/PageApiCallLog"
                                 }
                             }
                         }
@@ -17741,7 +18064,7 @@
                 "tags": [
                     "API Monitoring"
                 ],
-                "operationId": "getStatistics_7",
+                "operationId": "getStatistics_8",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -18056,6 +18379,301 @@
                             "*/*": {
                                 "schema": {
                                     "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/wallets": {
+            "get": {
+                "tags": [
+                    "Futures Trading"
+                ],
+                "summary": "Get futures wallet balances",
+                "description": "Returns USDT and INR futures wallet balances",
+                "operationId": "getWallets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiSecret": []
+                    },
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/futures/trade-log/{id}": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get a single trade log entry by ID",
+                "operationId": "getById_9",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "The auto-generated row ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FuturesTradeLog"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/stats": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get trade log statistics",
+                "description": "Returns aggregate counts broken down by source and event type.",
+                "operationId": "getStats_10",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/recent": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get recent trade log entries",
+                "description": "Returns the most recent entries ordered by event timestamp descending. Default limit is 50, max is 500.",
+                "operationId": "getRecent_2",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Maximum number of rows to return (1-500, default 50)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/position/{positionId}": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get trade log entries by position ID",
+                "description": "Returns all lifecycle events recorded for a specific futures position.",
+                "operationId": "getByPositionId_1",
+                "parameters": [
+                    {
+                        "name": "positionId",
+                        "in": "path",
+                        "description": "The futures position ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/pair/{pair}": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get trade log entries by trading pair",
+                "description": "Returns all lifecycle events for a specific futures pair (e.g. BTCUSDT).",
+                "operationId": "getByPair_2",
+                "parameters": [
+                    {
+                        "name": "pair",
+                        "in": "path",
+                        "description": "The trading pair symbol",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/order/{orderId}": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get trade log entries by order ID",
+                "description": "Returns all lifecycle events recorded for a specific order.",
+                "operationId": "getByOrderId_2",
+                "parameters": [
+                    {
+                        "name": "orderId",
+                        "in": "path",
+                        "description": "The order ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/event-type/{eventType}": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get trade log entries by event type",
+                "description": "Returns all entries matching the given event type (e.g. ORDER_SUBMITTED, POSITION_OPENED, POSITION_CLOSED, TAKE_PROFIT_SET, STOP_LOSS_SET, TAKE_PROFIT_TRIGGERED, STOP_LOSS_TRIGGERED, TRIGGERED_ORDER, ORDER_FILLED, POSITION_CLOSE_REQUESTED).",
+                "operationId": "getByEventType",
+                "parameters": [
+                    {
+                        "name": "eventType",
+                        "in": "path",
+                        "description": "The event type",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/futures/trade-log/all": {
+            "get": {
+                "tags": [
+                    "Futures Trade Log"
+                ],
+                "summary": "Get all trade log entries",
+                "description": "Returns every row in the trade log ordered by record_timestamp descending. Use /recent for large datasets.",
+                "operationId": "getAll",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                    }
                                 }
                             }
                         }
@@ -19885,85 +20503,6 @@
                     }
                 }
             },
-            "ExchangeV1DerivativesFuturesPositionsExitPost200Response": {
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string"
-                    },
-                    "status": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "code": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "data": {
-                        "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsExitPost200ResponseData"
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsExitPost200ResponseData": {
-                "type": "object",
-                "properties": {
-                    "groupId": {
-                        "type": "string"
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "takeProfit": {
-                        "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestTakeProfit"
-                    },
-                    "stopLoss": {
-                        "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestStopLoss"
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestStopLoss": {
-                "type": "object",
-                "properties": {
-                    "stopPrice": {
-                        "type": "string"
-                    },
-                    "limitPrice": {
-                        "type": "string"
-                    },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "stop_market"
-                        ]
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsCreateTpslPostRequestTakeProfit": {
-                "type": "object",
-                "properties": {
-                    "stopPrice": {
-                        "type": "string"
-                    },
-                    "limitPrice": {
-                        "type": "string"
-                    },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "take_profit_market"
-                        ]
-                    }
-                }
-            },
             "ExchangeV1DerivativesFuturesPositionsAddMarginPostRequest": {
                 "type": "object",
                 "properties": {
@@ -20007,89 +20546,6 @@
                                 "USDT"
                             ]
                         }
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesOrdersCreatePostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "side": {
-                        "type": "string",
-                        "enum": [
-                            "buy",
-                            "sell"
-                        ]
-                    },
-                    "pair": {
-                        "type": "string"
-                    },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "market",
-                            "limit",
-                            "stop_limit",
-                            "stop_market",
-                            "take_profit_limit",
-                            "take_profit_market"
-                        ]
-                    },
-                    "price": {
-                        "type": "number"
-                    },
-                    "stopPrice": {
-                        "type": "number"
-                    },
-                    "totalQuantity": {
-                        "type": "number"
-                    },
-                    "leverage": {
-                        "type": "number"
-                    },
-                    "notification": {
-                        "type": "string",
-                        "enum": [
-                            "no_notification",
-                            "email_notification"
-                        ]
-                    },
-                    "timeInForce": {
-                        "type": "string",
-                        "enum": [
-                            "good_till_cancel",
-                            "fill_or_kill",
-                            "immediate_or_cancel"
-                        ]
-                    },
-                    "hidden": {
-                        "type": "boolean"
-                    },
-                    "postOnly": {
-                        "type": "boolean"
-                    },
-                    "marginCurrencyShortName": {
-                        "type": "string",
-                        "enum": [
-                            "INR",
-                            "USDT"
-                        ]
-                    },
-                    "positionMarginType": {
-                        "type": "string",
-                        "enum": [
-                            "isolated",
-                            "crossed"
-                        ]
-                    },
-                    "takeProfitPrice": {
-                        "type": "number"
-                    },
-                    "stopLossPrice": {
-                        "type": "number"
                     }
                 }
             },
@@ -20914,6 +21370,49 @@
                     }
                 }
             },
+            "WebSocketFuturesInstrumentPrice": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "instrument": {
+                        "type": "string"
+                    },
+                    "markPrice": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "benchmarkTimestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "calculatedMarkTimestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "eventTimestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "parentTimestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "versionSequence": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "productType": {
+                        "type": "string"
+                    },
+                    "recordTimestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
             "WebSocketFuturesCurrentPricesData": {
                 "type": "object",
                 "properties": {
@@ -21440,6 +21939,92 @@
                     }
                 }
             },
+            "PageApiCallLog": {
+                "type": "object",
+                "properties": {
+                    "totalPages": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "totalElements": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "first": {
+                        "type": "boolean"
+                    },
+                    "last": {
+                        "type": "boolean"
+                    },
+                    "size": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ApiCallLog"
+                        }
+                    },
+                    "number": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "sort": {
+                        "$ref": "#/components/schemas/SortObject"
+                    },
+                    "numberOfElements": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "pageable": {
+                        "$ref": "#/components/schemas/PageableObject"
+                    },
+                    "empty": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "PageableObject": {
+                "type": "object",
+                "properties": {
+                    "offset": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "sort": {
+                        "$ref": "#/components/schemas/SortObject"
+                    },
+                    "pageSize": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "pageNumber": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "paged": {
+                        "type": "boolean"
+                    },
+                    "unpaged": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "SortObject": {
+                "type": "object",
+                "properties": {
+                    "empty": {
+                        "type": "boolean"
+                    },
+                    "sorted": {
+                        "type": "boolean"
+                    },
+                    "unsorted": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "ApiCallStatistics": {
                 "type": "object",
                 "properties": {
@@ -21469,6 +22054,74 @@
                     "maxExecutionTimeMs": {
                         "type": "integer",
                         "format": "int64"
+                    }
+                }
+            },
+            "FuturesTradeLog": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "eventType": {
+                        "type": "string"
+                    },
+                    "pair": {
+                        "type": "string"
+                    },
+                    "positionId": {
+                        "type": "string"
+                    },
+                    "orderId": {
+                        "type": "string"
+                    },
+                    "groupId": {
+                        "type": "string"
+                    },
+                    "side": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "orderType": {
+                        "type": "string"
+                    },
+                    "triggerType": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "triggerPrice": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "eventTimestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "channelName": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "rawData": {
+                        "type": "string"
+                    },
+                    "recordTimestamp": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 }
             }

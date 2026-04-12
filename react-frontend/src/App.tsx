@@ -1,11 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { TradeConfigProvider } from './context/TradeConfigContext';
 import Header from './components/Header';
 import MarketPage from './pages/MarketPage';
 import LoginPage from './pages/LoginPage';
 import WebSocketPage from './pages/WebSocketPage';
 import ChartPage from './pages/ChartPage';
+import FuturesTradingPage from './pages/FuturesTradingPage';
+import TradeConfigPage from './pages/TradeConfigPage';
+import TradeLogPage from './pages/TradeLogPage';
 import './App.css';
 
 // Protected Route Component
@@ -21,6 +25,7 @@ const AppRoutes: React.FC = () => {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<MarketPage />} />
+          <Route path="/chart/:marketType/:symbol" element={<ChartPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/orders"
@@ -30,14 +35,9 @@ const AppRoutes: React.FC = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/futures"
-            element={
-              <ProtectedRoute>
-                <div className="page"><h1>Futures Page - Coming Soon</h1></div>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/futures" element={<FuturesTradingPage />} />
+          <Route path="/trade-config" element={<TradeConfigPage />} />
+          <Route path="/trade-log" element={<TradeLogPage />} />
           <Route
             path="/margin"
             element={
@@ -75,9 +75,11 @@ const AppRoutes: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <TradeConfigProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </TradeConfigProvider>
     </AuthProvider>
   );
 }
