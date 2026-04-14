@@ -32,12 +32,12 @@
     ],
     "tags": [
         {
-            "name": "Margin Trading",
-            "description": "APIs for margin trading operations"
-        },
-        {
             "name": "User Account",
             "description": "APIs for user account information and balances"
+        },
+        {
+            "name": "Margin Trading",
+            "description": "APIs for margin trading operations"
         },
         {
             "name": "Public Market Data",
@@ -400,6 +400,8 @@
                 "tags": [
                     "User Account"
                 ],
+                "summary": "Get merged CoinDCX and MT5 account info",
+                "description": "Fetches CoinDCX user account info and MetaTrader 5 full account snapshot simultaneously, merging them into { \"coindcx\": {...}, \"mt5\": {...} }. If a source fails, its error is included in 'coindcx_error' or 'mt5_error' and the other source result is still returned.",
                 "operationId": "getUserInfo",
                 "requestBody": {
                     "content": {
@@ -417,7 +419,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ExchangeV1UsersInfoPost200Response"
+                                    "type": "string"
                                 }
                             }
                         }
@@ -472,6 +474,128 @@
                         "apiKey": []
                     }
                 ]
+            }
+        },
+        "/api/public/mt5/registry/symbols/enable-batch": {
+            "post": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 enable a list of symbols",
+                "operationId": "mt5RegistryEnableBatch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/enable-all": {
+            "post": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 enable ALL symbols for trading",
+                "operationId": "mt5RegistryEnableAll",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/disable-batch": {
+            "post": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 disable a list of symbols",
+                "operationId": "mt5RegistryDisableBatch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/disable-all": {
+            "post": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 disable ALL symbols",
+                "operationId": "mt5RegistryDisableAll",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/orders/trade-history": {
@@ -654,7 +778,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ExchangeV1OrdersCreatePost200Response"
+                                    "type": "object"
                                 }
                             }
                         }
@@ -1409,12 +1533,17 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Get merged futures and MT5 trade history",
+                "description": "Fetches trade history from both CoinDCX futures and MetaTrader 5 simultaneously, then merges the results into a single response with two keys: 'futures' and 'mt5'. If a source fails, its error is included in 'futures_error' or 'mt5_error' and the other source result is still returned. Shared optional params: from (YYYY-MM-DD), to (YYYY-MM-DD), symbol/pair. CoinDCX-only params: order_id, page, size.",
                 "operationId": "getTrades",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesTradesPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1447,12 +1576,17 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Get futures or MT5 open positions",
+                "description": "Returns CoinDCX futures positions by default. Set \"margin_currency_short_name\": \"MT5\" to retrieve all MetaTrader 5 positions, or include a \"pair\" that is an enabled MT5 symbol to filter by that symbol.",
                 "operationId": "getPositions",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1523,12 +1657,17 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Get merged futures position transactions and MT5 PnL history",
+                "description": "Fetches CoinDCX futures position transactions and MetaTrader 5 closed-position PnL simultaneously, then merges the results into a single response with two keys: 'futures' and 'mt5'. If a source fails, its error is included in 'futures_error' or 'mt5_error' and the other source result is still returned. Shared optional params: from (YYYY-MM-DD), to (YYYY-MM-DD), symbol. CoinDCX-only params: stage (all/default/funding/exit/tpsl_exit/liquidation), page, size.",
                 "operationId": "getPositionTransactions",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesPositionsTransactionsPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1599,6 +1738,8 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Exit a futures position or close an MT5 position",
+                "description": "Closes a CoinDCX futures position by pair/position_id by default. Routes to MetaTrader 5 when a 'ticket' field (long) is present in the body — closes the MT5 position with that ticket and cancels all pending orders on the same symbol. MT5 fields: ticket (required). CoinDCX fields: market/pair, position_id (optional).",
                 "operationId": "exitPosition_1",
                 "requestBody": {
                     "content": {
@@ -1640,6 +1781,8 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Set TP/SL on a futures or MT5 position",
+                "description": "Sets take-profit and/or stop-loss on a CoinDCX futures position by pair/position_id by default. Routes to MetaTrader 5 when a 'ticket' field (long) is present in the body. MT5 fields: ticket (required), target_price/take_profit_price (TP, optional), stop_loss/stop_loss_price (SL, optional). At least one of TP or SL must be provided. CoinDCX fields: market/pair, position_id (optional), target_price, stop_loss.",
                 "operationId": "createTpSl",
                 "requestBody": {
                     "content": {
@@ -1757,12 +1900,17 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Get futures or MT5 pending orders",
+                "description": "Returns CoinDCX futures orders by default. Set \"margin_currency_short_name\": \"MT5\" to retrieve all MetaTrader 5 pending orders, or include a \"pair\" that is an enabled MT5 symbol to filter by that symbol.",
                 "operationId": "getOrders",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ExchangeV1DerivativesFuturesOrdersPostRequest"
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "object"
+                                }
                             }
                         }
                     },
@@ -1795,6 +1943,8 @@
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Create a futures order or open an MT5 position",
+                "description": "Creates a CoinDCX futures order by default. Routes to MetaTrader 5 when \"margin_currency_short_name\": \"MT5\" is set, or when the pair/symbol is a registered and enabled MT5 symbol. MT5 fields: pair/market/symbol, side/type/direction (buy/sell/long/short), margin_usdt (optional).",
                 "operationId": "createOrder_1",
                 "requestBody": {
                     "content": {
@@ -1905,6 +2055,70 @@
                         "apiKey": []
                     }
                 ]
+            }
+        },
+        "/api/public/mt5/registry/symbols/{name}/enable": {
+            "patch": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 enable trading for a single symbol",
+                "operationId": "mt5RegistryEnableSymbol",
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "description": "MT5 symbol name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SymbolInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/{name}/disable": {
+            "patch": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 disable trading for a single symbol",
+                "operationId": "mt5RegistryDisableSymbol",
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "description": "MT5 symbol name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SymbolInfo"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/websocket/subscriptions": {
@@ -17741,6 +17955,39 @@
                 }
             }
         },
+        "/api/user/mt5/health": {
+            "get": {
+                "tags": [
+                    "User Account"
+                ],
+                "summary": "MT5 gateway liveness check",
+                "description": "Verifies the MetaTrader 5 gateway is reachable.",
+                "operationId": "mt5Health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiSecret": []
+                    },
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
         "/api/public/trade-history": {
             "get": {
                 "tags": [
@@ -17844,6 +18091,295 @@
                             "*/*": {
                                 "schema": {
                                     "$ref": "#/components/schemas/MarketDataOrderbookGet200Response"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/ticks": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 raw tick data for a symbol",
+                "description": "Returns raw ticks. Omit 'from' for the latest 'count' ticks.",
+                "operationId": "mt5Ticks",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "query",
+                        "description": "Symbol name, e.g. XAUUSD",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "count",
+                        "in": "query",
+                        "description": "Number of ticks (default 100, max 10000)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    },
+                    {
+                        "name": "flags",
+                        "in": "query",
+                        "description": "Tick type filter: all | info | trade",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Start timestamp YYYY-MM-DDTHH:MM:SS",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "End timestamp YYYY-MM-DDTHH:MM:SS",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 paginated list of all symbols",
+                "operationId": "mt5RegistryListAll",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "0-based page index",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "size",
+                        "in": "query",
+                        "description": "Page size, max 200",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageSymbolInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/{name}": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 get symbol details by name",
+                "operationId": "mt5RegistryGetSymbol",
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "description": "MT5 symbol name, case-sensitive",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SymbolInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/{name}/tradeable": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 check whether a symbol is currently enabled for trading",
+                "operationId": "mt5RegistryIsTradeable",
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "description": "MT5 symbol name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/search": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 search symbols by name or description",
+                "operationId": "mt5RegistrySearch",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Search term, e.g. 'gold' or 'XAU'",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "0-based page index",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "size",
+                        "in": "query",
+                        "description": "Page size, max 200",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageSymbolInfo"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/symbols/enabled": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 symbols currently enabled for trading",
+                "operationId": "mt5RegistryListEnabled",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/SymbolInfo"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/mt5/registry/stats": {
+            "get": {
+                "tags": [
+                    "Public Market Data"
+                ],
+                "summary": "MT5 symbol registry statistics",
+                "description": "Returns total, enabled, and disabled symbol counts.",
+                "operationId": "mt5RegistryStats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "integer",
+                                        "format": "int64"
+                                    }
                                 }
                             }
                         }
@@ -18391,8 +18927,8 @@
                 "tags": [
                     "Futures Trading"
                 ],
-                "summary": "Get futures wallet balances",
-                "description": "Returns USDT and INR futures wallet balances",
+                "summary": "Get merged futures and MT5 wallet balances",
+                "description": "Fetches CoinDCX USDT/INR futures wallet balances and MetaTrader 5 wallet balance simultaneously, then merges them into { \"futures\": {...}, \"mt5\": {...} }. If a source fails, its error is included in 'futures_error' or 'mt5_error' and the other source result is still returned.",
                 "operationId": "getWallets",
                 "responses": {
                     "200": {
@@ -18422,6 +18958,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get a single trade log entry by ID",
+                "description": "Returns the trade log entry enriched with the latest order and position details.",
                 "operationId": "getById_9",
                 "parameters": [
                     {
@@ -18441,7 +18978,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/FuturesTradeLog"
+                                    "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                 }
                             }
                         }
@@ -18480,7 +19017,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get recent trade log entries",
-                "description": "Returns the most recent entries ordered by event timestamp descending. Default limit is 50, max is 500.",
+                "description": "Returns the most recent entries ordered by event timestamp descending, enriched with the latest order and position details. Default limit is 50, max is 500.",
                 "operationId": "getRecent_2",
                 "parameters": [
                     {
@@ -18503,7 +19040,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18518,7 +19055,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get trade log entries by position ID",
-                "description": "Returns all lifecycle events recorded for a specific futures position.",
+                "description": "Returns all lifecycle events recorded for a specific futures position, enriched with the latest order and position details.",
                 "operationId": "getByPositionId_1",
                 "parameters": [
                     {
@@ -18539,7 +19076,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18554,7 +19091,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get trade log entries by trading pair",
-                "description": "Returns all lifecycle events for a specific futures pair (e.g. BTCUSDT).",
+                "description": "Returns all lifecycle events for a specific futures pair (e.g. BTCUSDT), enriched with the latest order and position details.",
                 "operationId": "getByPair_2",
                 "parameters": [
                     {
@@ -18575,7 +19112,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18590,7 +19127,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get trade log entries by order ID",
-                "description": "Returns all lifecycle events recorded for a specific order.",
+                "description": "Returns all lifecycle events recorded for a specific order, enriched with the latest order and position details.",
                 "operationId": "getByOrderId_2",
                 "parameters": [
                     {
@@ -18611,7 +19148,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18626,7 +19163,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get trade log entries by event type",
-                "description": "Returns all entries matching the given event type (e.g. ORDER_SUBMITTED, POSITION_OPENED, POSITION_CLOSED, TAKE_PROFIT_SET, STOP_LOSS_SET, TAKE_PROFIT_TRIGGERED, STOP_LOSS_TRIGGERED, TRIGGERED_ORDER, ORDER_FILLED, POSITION_CLOSE_REQUESTED).",
+                "description": "Returns all entries matching the given event type (e.g. ORDER_SUBMITTED, POSITION_OPENED, POSITION_CLOSED, TAKE_PROFIT_SET, STOP_LOSS_SET, TAKE_PROFIT_TRIGGERED, STOP_LOSS_TRIGGERED, TRIGGERED_ORDER, ORDER_FILLED, POSITION_CLOSE_REQUESTED), enriched with the latest order and position details.",
                 "operationId": "getByEventType",
                 "parameters": [
                     {
@@ -18647,7 +19184,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18662,7 +19199,7 @@
                     "Futures Trade Log"
                 ],
                 "summary": "Get all trade log entries",
-                "description": "Returns every row in the trade log ordered by record_timestamp descending. Use /recent for large datasets.",
+                "description": "Returns every row in the trade log ordered by record_timestamp descending, enriched with the latest order and position details. Use /recent for large datasets.",
                 "operationId": "getAll",
                 "responses": {
                     "200": {
@@ -18672,7 +19209,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/FuturesTradeLog"
+                                        "$ref": "#/components/schemas/FuturesTradeLogWithDetailsDTO"
                                     }
                                 }
                             }
@@ -18681,17 +19218,58 @@
                 }
             }
         },
+        "/api/futures/leverage": {
+            "get": {
+                "tags": [
+                    "Futures Trading"
+                ],
+                "summary": "Get futures and MT5 account leverage",
+                "description": "Returns MetaTrader 5 account leverage and a note about CoinDCX leverage. CoinDCX does not have a standalone account leverage endpoint — leverage is configured per-position via POST /api/futures/positions/update-leverage. MT5 returns leverage as an integer and display string e.g. '1:500'. If MT5 fails, 'mt5_error' is included and 'futures' note is still returned.",
+                "operationId": "getLeverage",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiSecret": []
+                    },
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
         "/api/futures/instruments/active": {
             "get": {
                 "tags": [
                     "Futures Trading"
                 ],
+                "summary": "Get merged active futures instruments and MT5 symbols",
+                "description": "Fetches active CoinDCX futures instruments and MetaTrader 5 tradable symbols simultaneously, then merges them into a single response with two keys: 'futures' and 'mt5'. If a source fails, its error is included in 'futures_error' or 'mt5_error' and the other source result is still returned. CoinDCX param: marginCurrencyShortName (default USDT). MT5 param: search (case-insensitive substring filter, e.g. XAU).",
                 "operationId": "getActiveInstruments",
                 "parameters": [
                     {
                         "name": "marginCurrencyShortName",
                         "in": "query",
-                        "required": true,
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "USDT"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
                         "schema": {
                             "type": "string"
                         }
@@ -18703,10 +19281,7 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object"
-                                    }
+                                    "type": "string"
                                 }
                             }
                         }
@@ -18753,6 +19328,77 @@
                             "*/*": {
                                 "schema": {
                                     "$ref": "#/components/schemas/MarketDataV3OrderbookInstrumentFuturesDepthGet200Response"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "apiSecret": []
+                    },
+                    {
+                        "apiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/futures/candles": {
+            "get": {
+                "tags": [
+                    "Futures Trading"
+                ],
+                "summary": "Get merged futures and MT5 candlestick data",
+                "description": "Fetches OHLCV candlestick bars from both CoinDCX futures and MetaTrader 5 simultaneously. CoinDCX params: pair (required), from (epoch ms), to (epoch ms), resolution (e.g. 1, 5, 15, 30, 60, 1D; default 1D). MT5 timeframe and date range are automatically inferred from these same parameters. Resolution mapping: 1→M1, 5→M5, 15→M15, 30→M30, 60→H1, 240→H4, 1D→D1, 1W→W1. If a source fails, its error is in 'futures_error' or 'mt5_error'.",
+                "operationId": "getCandlesticks",
+                "parameters": [
+                    {
+                        "name": "pair",
+                        "in": "query",
+                        "description": "Trading pair / symbol, e.g. BTCUSDT or XAUUSD",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Start timestamp (epoch ms)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "End timestamp (epoch ms)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    },
+                    {
+                        "name": "resolution",
+                        "in": "query",
+                        "description": "Candle resolution, e.g. 1, 5, 15, 30, 60, 1D (default 1D)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "1D"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "string"
                                 }
                             }
                         }
@@ -19665,14 +20311,6 @@
                     }
                 }
             },
-            "ExchangeV1UsersInfoPost200Response": {
-                "type": "object",
-                "properties": {
-                    "coindcxId": {
-                        "type": "string"
-                    }
-                }
-            },
             "ExchangeV1UsersBalancesPost200ResponseInner": {
                 "type": "object",
                 "properties": {
@@ -19840,17 +20478,6 @@
                     "timestamp": {
                         "type": "integer",
                         "format": "int64"
-                    }
-                }
-            },
-            "ExchangeV1OrdersCreatePost200Response": {
-                "type": "object",
-                "properties": {
-                    "orders": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ExchangeV1OrdersCreatePost200ResponseOrdersInner"
-                        }
                     }
                 }
             },
@@ -20345,76 +20972,6 @@
                     }
                 }
             },
-            "ExchangeV1DerivativesFuturesTradesPostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "pair": {
-                        "type": "string"
-                    },
-                    "orderId": {
-                        "type": "string"
-                    },
-                    "fromDate": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "toDate": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "page": {
-                        "type": "string"
-                    },
-                    "size": {
-                        "type": "string"
-                    },
-                    "marginCurrencyShortName": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "INR",
-                                "USDT"
-                            ]
-                        }
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsPostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "page": {
-                        "type": "string"
-                    },
-                    "size": {
-                        "type": "string"
-                    },
-                    "pairs": {
-                        "type": "string"
-                    },
-                    "positionIds": {
-                        "type": "string"
-                    },
-                    "marginCurrencyShortName": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "INR",
-                                "USDT"
-                            ]
-                        }
-                    }
-                }
-            },
             "ExchangeV1DerivativesFuturesPositionsUpdateLeveragePostRequest": {
                 "type": "object",
                 "properties": {
@@ -20437,42 +20994,6 @@
                             "INR",
                             "USDT"
                         ]
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesPositionsTransactionsPostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "stage": {
-                        "type": "string",
-                        "enum": [
-                            "all",
-                            "default",
-                            "funding",
-                            "exit",
-                            "tpsl_exit",
-                            "liquidation"
-                        ]
-                    },
-                    "page": {
-                        "type": "string"
-                    },
-                    "size": {
-                        "type": "string"
-                    },
-                    "marginCurrencyShortName": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "INR",
-                                "USDT"
-                            ]
-                        }
                     }
                 }
             },
@@ -20515,37 +21036,6 @@
                     },
                     "amount": {
                         "type": "number"
-                    }
-                }
-            },
-            "ExchangeV1DerivativesFuturesOrdersPostRequest": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "page": {
-                        "type": "string"
-                    },
-                    "size": {
-                        "type": "string"
-                    },
-                    "pairs": {
-                        "type": "string"
-                    },
-                    "orderIds": {
-                        "type": "string"
-                    },
-                    "marginCurrencyShortName": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "INR",
-                                "USDT"
-                            ]
-                        }
                     }
                 }
             },
@@ -20593,6 +21083,71 @@
                                 "USDT"
                             ]
                         }
+                    }
+                }
+            },
+            "SymbolInfo": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "tradeMode": {
+                        "type": "string"
+                    },
+                    "currencyBase": {
+                        "type": "string"
+                    },
+                    "currencyProfit": {
+                        "type": "string"
+                    },
+                    "currencyMargin": {
+                        "type": "string"
+                    },
+                    "digits": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "spread": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "contractSize": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "volumeMin": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "volumeMax": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "volumeStep": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "inMarketWatch": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 }
             },
@@ -21774,6 +22329,92 @@
                     }
                 }
             },
+            "PageSymbolInfo": {
+                "type": "object",
+                "properties": {
+                    "totalPages": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "totalElements": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "first": {
+                        "type": "boolean"
+                    },
+                    "last": {
+                        "type": "boolean"
+                    },
+                    "numberOfElements": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "size": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "content": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SymbolInfo"
+                        }
+                    },
+                    "number": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "sort": {
+                        "$ref": "#/components/schemas/SortObject"
+                    },
+                    "pageable": {
+                        "$ref": "#/components/schemas/PageableObject"
+                    },
+                    "empty": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "PageableObject": {
+                "type": "object",
+                "properties": {
+                    "offset": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "sort": {
+                        "$ref": "#/components/schemas/SortObject"
+                    },
+                    "paged": {
+                        "type": "boolean"
+                    },
+                    "unpaged": {
+                        "type": "boolean"
+                    },
+                    "pageSize": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "pageNumber": {
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                }
+            },
+            "SortObject": {
+                "type": "object",
+                "properties": {
+                    "empty": {
+                        "type": "boolean"
+                    },
+                    "unsorted": {
+                        "type": "boolean"
+                    },
+                    "sorted": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "ExchangeV1MarketsDetailsGet200ResponseInner": {
                 "type": "object",
                 "properties": {
@@ -21956,6 +22597,10 @@
                     "last": {
                         "type": "boolean"
                     },
+                    "numberOfElements": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
                     "size": {
                         "type": "integer",
                         "format": "int32"
@@ -21973,54 +22618,10 @@
                     "sort": {
                         "$ref": "#/components/schemas/SortObject"
                     },
-                    "numberOfElements": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
                     "pageable": {
                         "$ref": "#/components/schemas/PageableObject"
                     },
                     "empty": {
-                        "type": "boolean"
-                    }
-                }
-            },
-            "PageableObject": {
-                "type": "object",
-                "properties": {
-                    "offset": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "sort": {
-                        "$ref": "#/components/schemas/SortObject"
-                    },
-                    "pageSize": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "pageNumber": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "paged": {
-                        "type": "boolean"
-                    },
-                    "unpaged": {
-                        "type": "boolean"
-                    }
-                }
-            },
-            "SortObject": {
-                "type": "object",
-                "properties": {
-                    "empty": {
-                        "type": "boolean"
-                    },
-                    "sorted": {
-                        "type": "boolean"
-                    },
-                    "unsorted": {
                         "type": "boolean"
                     }
                 }
@@ -22122,6 +22723,20 @@
                     "recordTimestamp": {
                         "type": "string",
                         "format": "date-time"
+                    }
+                }
+            },
+            "FuturesTradeLogWithDetailsDTO": {
+                "type": "object",
+                "properties": {
+                    "log": {
+                        "$ref": "#/components/schemas/FuturesTradeLog"
+                    },
+                    "orderDetails": {
+                        "$ref": "#/components/schemas/WebSocketFuturesOrderUpdateData"
+                    },
+                    "positionDetails": {
+                        "$ref": "#/components/schemas/WebSocketFuturesPositionUpdateData"
                     }
                 }
             }

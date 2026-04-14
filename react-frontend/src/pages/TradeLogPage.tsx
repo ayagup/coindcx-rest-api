@@ -5,6 +5,7 @@ import ErrorMessage from '../components/ErrorMessage';
 import {
   RefreshCw, Search, Filter, BarChart2, Clock, TrendingUp,
   TrendingDown, AlertCircle, CheckCircle, Zap, List, Activity,
+  ChevronDown, ChevronRight,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -29,6 +30,23 @@ interface FuturesTradeLog {
   message?: string;
   rawData?: string;
   recordTimestamp?: string;
+}
+
+interface PositionSummary {
+  positionId: string;
+  pair: string;
+  side: string;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  quantity: number | null;
+  pnl: number | null;
+  status: 'open' | 'closed' | 'unknown';
+  openedAt: number | null;
+  closedAt: number | null;
+  eventCount: number;
+  events: FuturesTradeLog[];
+  tpPrice: number | null;
+  slPrice: number | null;
 }
 
 interface TradeLogStats {
@@ -78,6 +96,164 @@ const eventBadgeClass = (eventType?: string): string => {
   }
 };
 
+// Priority order for entry price events
+const ENTRY_EVENT_PRIORITY = ['POSITION_OPENED', 'ORDER_FILLED', 'TRIGGERED_ORDER', 'ORDER_SUBMITTED'];
+// Priority order for exit price events
+const EXIT_EVENT_PRIORITY  = ['POSITION_CLOSED', 'TAKE_PROFIT_TRIGGERED', 'STOP_LOSS_TRIGGERED'];
+
+/** Parse rawData JSON string, silently returning {} on failure */
+const parseRaw = (raw?: string): Record<string, any> => {
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
+};
+
+/** Return first non-null, non-zero number from a list of candidates */
+const firstNonZero = (...vals: (number | null | undefined)[]): number | null => {
+  for (const v of vals) if (v != null && v !== 0) return v;
+  return null;
+};
+
+/**
+ * Enrich a log entry with values from its rawData blob when top-level
+ * typed fields are null/undefined.
+ * rawData may be a JSON object OR a JSON array (e.g. ORDER_SUBMITTED wraps
+ * the order in an array). We try both and pick the first element.
+ */
+const enrich = (e: FuturesTradeLog): FuturesTradeLog & Record<string, any> => {
+  let rawParsed = parseRaw(e.rawData);
+  // If rawData is an array, take first element
+  if (Array.isArray(rawParsed)) rawParsed = rawParsed[0] ?? {};
+  const raw: Record<string, any> = rawParsed;
+  return {
+    ...e,
+    // avg_price is 0.0 when order is submitted but not yet filled — skip zeros
+    price:          (e.price != null && e.price !== 0
+                      ? e.price
+                      : firstNonZero(raw.price, raw.avg_price, raw.avgPrice, raw.lastPrice, raw.last_price)) ?? undefined,
+    quantity:       e.quantity       ?? raw.total_quantity ?? raw.quantity
+                                     ?? raw.qty            ?? raw.size
+                                     ?? raw.amount         ?? raw.origQty      ?? null,
+    side:           e.side           ?? raw.side           ?? raw.orderSide     ?? raw.order_side ?? null,
+    pair:           e.pair           ?? raw.pair           ?? raw.symbol        ?? raw.market    ?? null,
+    triggerPrice:   e.triggerPrice   ?? raw.triggerPrice   ?? raw.trigger_price ?? raw.stopPrice ?? null,
+    orderType:      e.orderType      ?? raw.order_type     ?? raw.orderType     ?? raw.type      ?? null,
+    status:         e.status         ?? raw.status         ?? raw.orderStatus   ?? null,
+    eventTimestamp: e.eventTimestamp ?? raw.eventTimestamp ?? raw.timestamp     ?? raw.created_at ?? raw.time ?? null,
+  };
+};
+
+const firstWith = <K extends keyof FuturesTradeLog>(
+  events: FuturesTradeLog[],
+  key: K,
+  priorityTypes?: string[],
+): FuturesTradeLog[K] | null => {
+  if (priorityTypes) {
+    for (const et of priorityTypes) {
+      const found = events.find(e => e.eventType === et && e[key] != null);
+      if (found) return found[key] ?? null;
+    }
+  }
+  return events.find(e => e[key] != null)?.[key] ?? null;
+};
+
+const computePositionSummaries = (entries: FuturesTradeLog[]): PositionSummary[] => {
+  // Enrich every entry up front
+  const allEnriched = entries.map(enrich);
+
+  // Separate entries that belong to a position from "loose" order events (no positionId)
+  const groups    = new Map<string, typeof allEnriched>();
+  const looseOrders = allEnriched.filter(e => !e.positionId);
+
+  for (const entry of allEnriched) {
+    if (!entry.positionId) continue;
+    if (!groups.has(entry.positionId)) groups.set(entry.positionId, []);
+    groups.get(entry.positionId)!.push(entry);
+  }
+
+  const summaries: PositionSummary[] = [];
+
+  for (const [positionId, events] of groups) {
+    // Sort chronologically
+    const sorted = [...events].sort((a, b) => (a.eventTimestamp ?? 0) - (b.eventTimestamp ?? 0));
+    const firstTs = sorted[0]?.eventTimestamp ?? 0;
+    const positionPair = (firstWith(sorted, 'pair') as string | null) ?? null;
+
+    // ── Try to find a matching loose ORDER_SUBMITTED for the same pair ──
+    // Pick the loose order closest in time (within 60 seconds before the first position event)
+    const MATCH_WINDOW_MS = 60_000;
+    const matchedOrder = looseOrders
+      .filter(o =>
+        o.eventType === 'ORDER_SUBMITTED' &&
+        o.pair === positionPair &&
+        o.eventTimestamp != null &&
+        o.eventTimestamp <= firstTs + MATCH_WINDOW_MS &&
+        o.eventTimestamp >= firstTs - MATCH_WINDOW_MS
+      )
+      .sort((a, b) => Math.abs((a.eventTimestamp ?? 0) - firstTs) - Math.abs((b.eventTimestamp ?? 0) - firstTs))[0] ?? null;
+
+    const closeEvent = sorted.find(e => EXIT_EVENT_PRIORITY.includes(e.eventType ?? ''));
+
+    // pair / side — prefer matched order which has the most complete data
+    const pair = positionPair ?? matchedOrder?.pair ?? '—';
+    const side = (firstWith(sorted, 'side') as string | null)
+              ?? matchedOrder?.side
+              ?? '—';
+
+    // entry price — prefer matched order rawData (avg_price → price), then position events
+    const entryPrice: number | null =
+      matchedOrder?.price ??                                          // enriched avg_price / price from rawData
+      (firstWith(sorted, 'price', ENTRY_EVENT_PRIORITY) as number | null) ??
+      (firstWith(sorted, 'price') as number | null);
+
+    // exit price — from close/TP/SL triggered events
+    const exitPrice: number | null =
+      (firstWith(sorted, 'price', EXIT_EVENT_PRIORITY) as number | null);
+
+    // quantity — prefer matched order
+    const quantity: number | null =
+      matchedOrder?.quantity ??
+      (firstWith(sorted, 'quantity', ENTRY_EVENT_PRIORITY) as number | null) ??
+      (firstWith(sorted, 'quantity') as number | null);
+
+    // TP / SL trigger prices from position events
+    const tpEvent = sorted.find(e => e.eventType === 'TAKE_PROFIT_SET' || e.eventType === 'TAKE_PROFIT_TRIGGERED');
+    const slEvent = sorted.find(e => e.eventType === 'STOP_LOSS_SET'   || e.eventType === 'STOP_LOSS_TRIGGERED');
+    const tpPrice = tpEvent?.triggerPrice ?? null;
+    const slPrice = slEvent?.triggerPrice ?? null;
+
+    let pnl: number | null = null;
+    if (entryPrice != null && exitPrice != null && quantity != null && entryPrice !== exitPrice) {
+      pnl = side.toLowerCase() === 'buy'
+        ? (exitPrice  - entryPrice) * quantity
+        : (entryPrice - exitPrice)  * quantity;
+    }
+
+    const hasClosed = closeEvent != null;
+    const status: 'open' | 'closed' | 'unknown' = hasClosed ? 'closed'
+      : (sorted.some(e => e.eventType === 'POSITION_OPENED' || e.eventType === 'ORDER_FILLED') ||
+         matchedOrder != null) ? 'open'
+      : 'unknown';
+
+    const openedAt = matchedOrder?.eventTimestamp ?? sorted[0]?.eventTimestamp ?? null;
+    const closedAt = closeEvent?.eventTimestamp ?? null;
+
+    // Include the matched order in the events list so it shows in the expanded view
+    const allEvents = matchedOrder
+      ? [...sorted, matchedOrder].sort((a, b) => (a.eventTimestamp ?? 0) - (b.eventTimestamp ?? 0))
+      : sorted;
+
+    summaries.push({
+      positionId, pair, side, entryPrice, exitPrice, quantity, pnl,
+      status, openedAt, closedAt, tpPrice, slPrice,
+      eventCount: allEvents.length,
+      events: allEvents,
+    });
+  }
+
+  summaries.sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
+  return summaries;
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const TradeLogPage: React.FC = () => {
@@ -97,6 +273,7 @@ const TradeLogPage: React.FC = () => {
   // Local text search
   const [searchQuery, setSearchQuery] = useState('');
   const [showStats, setShowStats] = useState(false);
+  const [expandedPositionId, setExpandedPositionId] = useState<string | null>(null);
 
   // ── Data fetching ─────────────────────────────────────────────────────────
 
@@ -126,8 +303,10 @@ const TradeLogPage: React.FC = () => {
           url = `/api/futures/trade-log/event-type/${encodeURIComponent(eventTypeInput)}`;
           break;
         case 'positionId':
-          if (!positionIdInput.trim()) { setError('Please enter a position ID.'); setLoading(false); return; }
-          url = `/api/futures/trade-log/position/${encodeURIComponent(positionIdInput.trim())}`;
+          // If a specific ID is given, filter to that position; otherwise load recent entries for grouping
+          url = positionIdInput.trim()
+            ? `/api/futures/trade-log/position/${encodeURIComponent(positionIdInput.trim())}`
+            : `/api/futures/trade-log/recent?limit=500`;
           break;
         case 'orderId':
           if (!orderIdInput.trim()) { setError('Please enter an order ID.'); setLoading(false); return; }
@@ -138,8 +317,11 @@ const TradeLogPage: React.FC = () => {
           break;
       }
       const res = await publicApiClient.get(url);
-      // API may return a single object or an array
-      const data = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
+      // API returns [{ log: FuturesTradeLog, orderDetails, positionDetails }] — unwrap .log
+      const raw = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
+      const data: FuturesTradeLog[] = raw.map((item: any) =>
+        item?.log != null ? item.log : item
+      );
       setEntries(data);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to load trade log.');
@@ -302,13 +484,13 @@ const TradeLogPage: React.FC = () => {
 
           {filterMode === 'positionId' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Position ID:</label>
+              <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Position ID (optional):</label>
               <input
                 className="input"
-                placeholder="Enter position ID…"
+                placeholder="Leave blank to show all positions…"
                 value={positionIdInput}
                 onChange={e => setPositionIdInput(e.target.value)}
-                style={{ width: 280 }}
+                style={{ width: 320 }}
               />
             </div>
           )}
@@ -362,7 +544,7 @@ const TradeLogPage: React.FC = () => {
       {loading && <Loading />}
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
-      {/* ── Table ── */}
+      {/* ── Table / Position Summary ── */}
       {!loading && !error && filteredEntries.length === 0 && (
         <div className="card" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40 }}>
           <AlertCircle size={32} style={{ marginBottom: 8 }} />
@@ -370,7 +552,168 @@ const TradeLogPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && filteredEntries.length > 0 && (
+      {/* ── Position PnL Summary (By Position mode) ── */}
+      {!loading && filterMode === 'positionId' && filteredEntries.length > 0 && (() => {
+        const summaries = computePositionSummaries(filteredEntries);
+        if (summaries.length === 0) return null;
+
+        return (
+          <>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <List size={16} />
+              <strong>Positions ({summaries.length})</strong>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>— PnL calculated from POSITION_OPENED / POSITION_CLOSED events</span>
+            </div>
+            <div className="table-container" style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ minWidth: 1050 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 32 }}></th>
+                    <th>Position ID</th>
+                    <th>Pair</th>
+                    <th>Side</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Entry Price</th>
+                    <th style={{ textAlign: 'right' }}>Exit Price</th>
+                    <th style={{ textAlign: 'right' }}>Quantity</th>
+                    <th style={{ textAlign: 'right' }}>TP Price</th>
+                    <th style={{ textAlign: 'right' }}>SL Price</th>
+                    <th style={{ textAlign: 'right' }}>PnL (USDT)</th>
+                    <th>Opened At</th>
+                    <th>Closed At</th>
+                    <th style={{ textAlign: 'right' }}>Events</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaries.map(pos => {
+                    const isExpanded = expandedPositionId === pos.positionId;
+                    const pnlColor = pos.pnl == null ? 'inherit'
+                      : pos.pnl > 0 ? 'var(--color-green, #22c55e)'
+                      : pos.pnl < 0 ? 'var(--color-red, #ef4444)'
+                      : 'inherit';
+                    return (
+                      <React.Fragment key={pos.positionId}>
+                        <tr
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setExpandedPositionId(isExpanded ? null : pos.positionId)}
+                        >
+                          <td style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </td>
+                          <td style={{ fontSize: 11, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }} title={pos.positionId}>
+                            {pos.positionId}
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{pos.pair}</td>
+                          <td>
+                            {pos.side && pos.side !== '—' ? (
+                              <span style={{
+                                color: pos.side.toLowerCase() === 'buy' ? 'var(--color-green, #22c55e)' : 'var(--color-red, #ef4444)',
+                                display: 'flex', alignItems: 'center', gap: 4, fontSize: 13,
+                              }}>
+                                {pos.side.toLowerCase() === 'buy' ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                                {pos.side.toUpperCase()}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td>
+                            <span className={pos.status === 'open' ? 'badge badge-open' : pos.status === 'closed' ? 'badge badge-closed' : 'badge badge-default'} style={{ fontSize: 11 }}>
+                              {pos.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(pos.entryPrice ?? undefined)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(pos.exitPrice ?? undefined)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(pos.quantity ?? undefined, 6)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace', color: '#2563eb' }}>{fmtNum(pos.tpPrice ?? undefined)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace', color: '#dc2626' }}>{fmtNum(pos.slPrice ?? undefined)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: pnlColor }}>
+                            {pos.pnl == null ? '—' : `${pos.pnl >= 0 ? '+' : ''}${fmtNum(pos.pnl, 4)}`}
+                          </td>
+                          <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{pos.openedAt ? fmtTime(pos.openedAt) : '—'}</td>
+                          <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{pos.closedAt ? fmtTime(pos.closedAt) : '—'}</td>
+                          <td style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-secondary)' }}>{pos.eventCount}</td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={14} style={{ padding: 0, background: 'var(--bg-secondary, #f9fafb)' }}>
+                              <div style={{ overflowX: 'auto' }}>
+                                <table className="data-table" style={{ minWidth: 900, fontSize: 12 }}>
+                                  <thead>
+                                    <tr>
+                                      <th>Event Type</th>
+                                      <th>Side</th>
+                                      <th>Order Type</th>
+                                      <th>Status</th>
+                                      <th style={{ textAlign: 'right' }}>Price</th>
+                                      <th style={{ textAlign: 'right' }}>Quantity</th>
+                                      <th style={{ textAlign: 'right' }}>Trigger Price</th>
+                                      <th>Order ID</th>
+                                      <th>Event Time</th>
+                                      <th>Message</th>
+                                      <th>Raw Data Preview</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {pos.events.map((entry, idx) => {
+                                      const raw = parseRaw(entry.rawData);
+                                      const rawPreview = Object.keys(raw).length
+                                        ? Object.entries(raw)
+                                            .filter(([, v]) => v != null && v !== '' && v !== 0)
+                                            .map(([k, v]) => `${k}=${typeof v === 'object' ? '{…}' : String(v)}`)
+                                            .join(' | ')
+                                        : '—';
+                                      return (
+                                      <tr key={entry.id ?? idx}>
+                                        <td>
+                                          <span className={eventBadgeClass(entry.eventType)} style={{ fontSize: 11 }}>
+                                            {entry.eventType ?? '—'}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          {entry.side ? (
+                                            <span style={{
+                                              color: entry.side.toLowerCase() === 'buy' ? 'var(--color-green, #22c55e)' : 'var(--color-red, #ef4444)',
+                                              display: 'flex', alignItems: 'center', gap: 4,
+                                            }}>
+                                              {entry.side.toLowerCase() === 'buy' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                              {entry.side.toUpperCase()}
+                                            </span>
+                                          ) : '—'}
+                                        </td>
+                                        <td>{entry.orderType ?? '—'}</td>
+                                        <td>{entry.status ?? '—'}</td>
+                                        <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(entry.price)}</td>
+                                        <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(entry.quantity, 6)}</td>
+                                        <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(entry.triggerPrice)}</td>
+                                        <td style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }} title={entry.orderId}>{entry.orderId ?? '—'}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{entry.eventTimestamp ? fmtTime(entry.eventTimestamp) : fmtTime(entry.recordTimestamp)}</td>
+                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.message}>{entry.message ?? '—'}</td>
+                                        <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'monospace' }} title={rawPreview}>
+                                          {rawPreview}
+                                        </td>
+                                      </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          </>
+        );
+      })()}
+
+
+      {/* ── Flat orders table (all modes except positionId) ── */}
+      {!loading && filterMode !== 'positionId' && filteredEntries.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="table-container" style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ minWidth: 1100 }}>
