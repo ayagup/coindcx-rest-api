@@ -63,28 +63,57 @@ public class MetaTraderService {
     // Market Data
     // -------------------------------------------------------------------------
 
-    public List<Object> getSymbols(String search) {
-        return metaTraderClient.getSymbols(search);
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getSymbols(String search) {
+        Map<String, Object> response = metaTraderClient.getSymbols(search);
+        if (response == null) return java.util.Collections.emptyList();
+        Object symbols = response.get("symbols");
+        if (symbols instanceof List) return (List<Map<String, Object>>) symbols;
+        return java.util.Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> getTicks(String symbol, Integer count, String flags, String from, String to) {
-        return metaTraderClient.getTicks(symbol, count, flags, from, to);
+        Map<String, Object> response = metaTraderClient.getTicks(symbol, count, flags, from, to);
+        if (response == null) return java.util.Collections.emptyList();
+        if (Boolean.FALSE.equals(response.get("ok"))) {
+            throw new RuntimeException(
+                    response.getOrDefault("error", "MT5 returned an error for symbol: " + symbol).toString());
+        }
+        Object ticks = response.get("ticks");
+        if (ticks instanceof List) return (List<Object>) ticks;
+        return java.util.Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> getCandlesticks(String symbol, String timeframe, Integer count, String from, String to) {
-        return metaTraderClient.getCandlesticks(symbol, timeframe, count, from, to);
+        Map<String, Object> response = metaTraderClient.getCandlesticks(symbol, timeframe, count, from, to);
+        if (response == null) return java.util.Collections.emptyList();
+        Object candles = response.get("candles");
+        if (candles instanceof List) return (List<Object>) candles;
+        return java.util.Collections.emptyList();
     }
 
     // -------------------------------------------------------------------------
     // Trading
     // -------------------------------------------------------------------------
 
+    @SuppressWarnings("unchecked")
     public List<Object> getPositions(String symbol) {
-        return metaTraderClient.getPositions(symbol);
+        Map<String, Object> response = metaTraderClient.getPositions(symbol);
+        if (response == null) return java.util.Collections.emptyList();
+        Object positions = response.get("positions");
+        if (positions instanceof List) return (List<Object>) positions;
+        return java.util.Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> getOrders(String symbol) {
-        return metaTraderClient.getOrders(symbol);
+        Map<String, Object> response = metaTraderClient.getOrders(symbol);
+        if (response == null) return java.util.Collections.emptyList();
+        Object orders = response.get("orders");
+        if (orders instanceof List) return (List<Object>) orders;
+        return java.util.Collections.emptyList();
     }
 
     /**
@@ -96,6 +125,12 @@ public class MetaTraderService {
         String symbol = request.getSymbol();
         if (symbol == null || symbol.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "symbol is required");
+        }
+        if (request.getMarginUsdt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "margin_usdt is required");
+        }
+        if (request.getMarginUsdt() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "margin_usdt must be greater than 0");
         }
         if (!symbolService.isSymbolEnabled(symbol)) {
             throw new ResponseStatusException(
@@ -127,11 +162,21 @@ public class MetaTraderService {
     // History
     // -------------------------------------------------------------------------
 
+    @SuppressWarnings("unchecked")
     public List<Object> getHistoryTrades(String from, String to, String symbol) {
-        return metaTraderClient.getHistoryTrades(from, to, symbol);
+        Map<String, Object> response = metaTraderClient.getHistoryTrades(from, to, symbol);
+        if (response == null) return java.util.Collections.emptyList();
+        Object trades = response.get("trades");
+        if (trades instanceof List) return (List<Object>) trades;
+        return java.util.Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> getHistoryPnl(String from, String to, String symbol) {
-        return metaTraderClient.getHistoryPnl(from, to, symbol);
+        Map<String, Object> response = metaTraderClient.getHistoryPnl(from, to, symbol);
+        if (response == null) return java.util.Collections.emptyList();
+        Object pnl = response.get("pnl");
+        if (pnl instanceof List) return (List<Object>) pnl;
+        return java.util.Collections.emptyList();
     }
 }
