@@ -285,6 +285,19 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Dev Tools: automatic restart & LiveReload (excluded from production builds) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Actuator: health, metrics, and management endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- OpenFeign for declarative REST clients -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

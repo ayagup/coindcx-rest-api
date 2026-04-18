@@ -588,6 +588,7 @@ def trade_open():
           $ref: '#/definitions/Error'
     """
     body = request.get_json(silent=True) or {}
+    logger.debug("POST /trade/open raw body=%r content_type=%r", request.data, request.content_type)
 
     symbol = body.get("symbol", "").strip().upper()
     if not symbol:

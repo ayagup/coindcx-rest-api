@@ -68,7 +68,7 @@ public class PublicController {
      * 
      * @return List of market details
      */
-    @GetMapping("/markets/details")
+    @GetMapping({"/markets/details", "/markets_details"})
     public ResponseEntity<List<ExchangeV1MarketsDetailsGet200ResponseInner>> getMarketDetails() {
         try {
             List<ExchangeV1MarketsDetailsGet200ResponseInner> details = publicService.getMarketDetails();

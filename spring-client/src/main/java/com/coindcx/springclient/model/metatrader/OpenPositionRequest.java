@@ -13,7 +13,7 @@ public class OpenPositionRequest {
     @JsonProperty("direction")
     private String direction = "long";
 
-    @JsonProperty("margin_usdt")
+    @JsonProperty(value = "margin_usdt", required = true)
     private Double marginUsdt;
 
     public OpenPositionRequest() {}

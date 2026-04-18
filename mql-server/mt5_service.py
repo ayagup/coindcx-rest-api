@@ -300,13 +300,21 @@ def set_tpsl(
         pos.ticket, pos.symbol, pos.type, pos.sl, pos.tp,
     )
 
-    # Keep existing value when caller passes None
-    new_sl = sl if sl is not None else pos.sl
-    new_tp = tp if tp is not None else pos.tp
+    # Get symbol info to normalise price precision
+    sym_info = mt5.symbol_info(pos.symbol)
+    if sym_info is None:
+        err = mt5.last_error()
+        logger.debug("set_tpsl: symbol_info(%s) returned None — %s", pos.symbol, err)
+        return {"ok": False, "error": f"symbol_info({pos.symbol}) returned None: {err}"}
+    digits = sym_info.digits
+
+    # Keep existing value when caller passes None; round to symbol precision
+    new_sl = round(sl, digits) if sl is not None else pos.sl
+    new_tp = round(tp, digits) if tp is not None else pos.tp
 
     req = {
         "action":   mt5.TRADE_ACTION_SLTP,
-        "ticket":   ticket,
+        "position": ticket,
         "symbol":   pos.symbol,
         "sl":       new_sl,
         "tp":       new_tp,
@@ -518,12 +526,17 @@ def get_open_orders(symbol: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def _parse_date(value: str | None, default: datetime.datetime) -> datetime.datetime:
-    """Parse an ISO-8601 date/datetime string, or return *default*."""
+    """Parse an ISO-8601 date/datetime string, or return *default*.
+
+    The returned datetime is always timezone-aware (UTC), which is required
+    by the MT5 Python API for history_deals_get / history_orders_get.
+    """
     if not value:
         return default
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.datetime.strptime(value, fmt)
+            dt = datetime.datetime.strptime(value, fmt)
+            return dt.replace(tzinfo=datetime.timezone.utc)
         except ValueError:
             continue
     raise ValueError(f"Cannot parse date: {value!r} (expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)")
@@ -570,7 +583,7 @@ def get_trade_history(
     *date_from* / *date_to*: ISO-8601 strings "YYYY-MM-DD" or
     "YYYY-MM-DDTHH:MM:SS".  Default window is the last 30 days.
     """
-    now     = datetime.datetime.now()
+    now     = datetime.datetime.now(datetime.timezone.utc)
     dt_from = _parse_date(date_from, now - datetime.timedelta(days=30))
     dt_to   = _parse_date(date_to,   now)
 
@@ -887,8 +900,9 @@ def get_candlesticks(
     count = min(max(1, count), 5000)
 
     if date_from:
-        dt_from = _parse_date(date_from, datetime.datetime.now() - datetime.timedelta(days=30))
-        dt_to   = _parse_date(date_to, datetime.datetime.now()) if date_to else datetime.datetime.now()
+        _now_utc = datetime.datetime.now(datetime.timezone.utc)
+        dt_from = _parse_date(date_from, _now_utc - datetime.timedelta(days=30))
+        dt_to   = _parse_date(date_to, _now_utc) if date_to else _now_utc
         logger.debug(
             "get_candlesticks: symbol=%s tf=%s from=%s to=%s",
             symbol, tf_key, dt_from.isoformat(), dt_to.isoformat(),
@@ -970,9 +984,10 @@ def get_ticks(
     count = min(max(1, count), 10_000)
 
     if date_from:
-        dt_from = _parse_date(date_from, datetime.datetime.now() - datetime.timedelta(minutes=10))
+        _now_utc = datetime.datetime.now(datetime.timezone.utc)
+        dt_from = _parse_date(date_from, _now_utc - datetime.timedelta(minutes=10))
         if date_to:
-            dt_to = _parse_date(date_to, datetime.datetime.now())
+            dt_to = _parse_date(date_to, _now_utc)
             logger.debug(
                 "get_ticks: symbol=%s flags=%s range %s → %s",
                 symbol, flag_key, dt_from.isoformat(), dt_to.isoformat(),
@@ -986,7 +1001,7 @@ def get_ticks(
             ticks = mt5.copy_ticks_from(symbol, dt_from, count, tick_flags)
     else:
         # latest N ticks
-        dt_from = datetime.datetime.now() - datetime.timedelta(seconds=1)
+        dt_from = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
         logger.debug("get_ticks: symbol=%s flags=%s count=%s (latest)", symbol, flag_key, count)
         ticks = mt5.copy_ticks_from(symbol, dt_from, count, tick_flags)
 
@@ -1051,7 +1066,7 @@ def get_market_trades(
         logger.debug("get_market_trades: symbol_select(%s) failed — %s", symbol, err)
         return {"ok": False, "error": f"symbol_select({symbol}) failed: {err}"}
 
-    dt_from = datetime.datetime.now() - datetime.timedelta(seconds=1)
+    dt_from = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
     logger.debug(
         "get_market_trades: symbol=%s count=%s (latest trade ticks)", symbol, count
     )

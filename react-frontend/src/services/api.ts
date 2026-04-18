@@ -96,6 +96,7 @@ export const apiService = {
   cancelAllFuturesOrders: (data: any) => apiClient.post('/api/futures/positions/cancel_all_orders', data),
   getFuturesTrades: (data: any) => apiClient.post('/api/futures/trades', data),
   getPositionTransactions: (data: any) => apiClient.post('/api/futures/positions/transactions', data),
+  getFuturesLeverage: () => apiClient.get('/api/futures/leverage'),
 
   // Margin Trading APIs
   createMarginOrder: (orderData: any) => apiClient.post('/api/margin/create', orderData),
@@ -182,6 +183,11 @@ export const apiService = {
   // Public (no-auth) version — used by FuturesTradingPage to get markPrice
   getFuturesMarketDataPublic: (contractSymbol: string, limit?: number, timeframe?: string) => 
     publicApiClient.get(`/api/websocket/data/futures/${contractSymbol}`, { params: { limit, timeframe } }),
+  // Per-instrument latest price (mark price) for a specific futures contract
+  getFuturesInstrumentPriceLatest: (instrument: string) =>
+    apiClient.get(`/api/websocket/futures-instrument-prices/instrument/${instrument}/latest`),
+  // Bulk current mark prices for all futures instruments (fallback)
+  getFuturesCurrentPricesPublic: () => apiClient.get('/api/websocket/futures-current-prices/latest'),
   getLatestSpotPrice: (marketPair: string) => 
     apiClient.get(`/api/websocket/data/spot/${marketPair}/latest-price`),
   getLatestFuturesPrice: (contractSymbol: string) => 
@@ -192,6 +198,7 @@ export const apiService = {
     apiClient.get(`/api/websocket/data/futures/${contractSymbol}/range`, { params: { since } }),
   getAllSpotMarkets: () => apiClient.get('/api/websocket/data/spot/markets'),
   getAllFuturesContracts: () => apiClient.get('/api/websocket/data/futures/contracts'),
+  getActiveFuturesInstruments: () => publicApiClient.get('/api/futures/instruments/active'),
 
   // Futures Trade Log APIs (no auth required — read-only append-only log)
   getTradeLogRecent: (limit = 50) => publicApiClient.get(`/api/futures/trade-log/recent?limit=${limit}`),

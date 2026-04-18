@@ -80,8 +80,8 @@ public class FuturesController {
             List<Object> mt5Symbols = new java.util.ArrayList<>();
             String mt5Error = null;
             try {
-                List<Object> result = metaTraderService.getSymbols(search);
-                if (result != null) mt5Symbols = result;
+                List<Map<String, Object>> result = metaTraderService.getSymbols(search);
+                if (result != null) mt5Symbols = new java.util.ArrayList<>(result);
             } catch (Exception e) {
                 mt5Error = e.getMessage();
             }
@@ -119,7 +119,9 @@ public class FuturesController {
                description = "Creates a CoinDCX futures order by default. "
                        + "Routes to MetaTrader 5 when \"margin_currency_short_name\": \"MT5\" is set, "
                        + "or when the pair/symbol is a registered and enabled MT5 symbol. "
-                       + "MT5 fields: pair/market/symbol, side/type/direction (buy/sell/long/short), margin_usdt (optional).")
+                       + "MT5 fields: pair/market/symbol (required), side/type/direction (buy/sell/long/short), "
+                       + "margin_usdt (USDT margin to use; falls back to quantity/total_quantity if absent, must be > 0). "
+                       + "leverage is accepted but ignored for MT5 — MT5 manages leverage internally.")
     public ResponseEntity<String> createOrder(@RequestBody Map<String, Object> body) {
         try {
             // pair: accept pair, market, or symbol
@@ -130,8 +132,8 @@ public class FuturesController {
             String marginMode = (String) body.get("margin_currency_short_name");
             boolean explicitMt5 = "MT5".equalsIgnoreCase(marginMode) || "METATRADER".equalsIgnoreCase(marginMode);
 
-            // -- MT5 routing: explicit mode flag OR pair is a registered/enabled MT5 symbol --
-            if (explicitMt5 || (pair != null && !pair.isBlank() && metaTraderSymbolService.isSymbolEnabled(pair))) {
+            // -- MT5 routing: explicit mode flag OR pair is an MT5 symbol --
+            if (explicitMt5 || (pair != null && !pair.isBlank() && isMt5Pair(pair))) {
                 if (pair == null || pair.isBlank()) {
                     return ResponseEntity.badRequest()
                             .header("Content-Type", "application/json")
@@ -143,8 +145,21 @@ public class FuturesController {
                         : (String) body.get("direction");
                 String direction = (raw != null && ("sell".equalsIgnoreCase(raw) || "short".equalsIgnoreCase(raw)))
                         ? "short" : "long";
-                Object marginRaw = body.get("margin_usdt");
-                Double marginUsdt = marginRaw != null ? Double.parseDouble(marginRaw.toString()) : null;
+                // margin_usdt: accept margin_usdt directly, or fall back to quantity/total_quantity
+                Object marginRaw = body.containsKey("margin_usdt") ? body.get("margin_usdt")
+                        : body.containsKey("quantity") ? body.get("quantity")
+                        : body.get("total_quantity");
+                if (marginRaw == null) {
+                    return ResponseEntity.badRequest()
+                            .header("Content-Type", "application/json")
+                            .body("{\"error\":\"margin_usdt (or quantity) is required for MT5 orders\"}");
+                }
+                Double marginUsdt = Double.parseDouble(marginRaw.toString());
+                if (marginUsdt <= 0) {
+                    return ResponseEntity.badRequest()
+                            .header("Content-Type", "application/json")
+                            .body("{\"error\":\"margin_usdt must be greater than 0\"}");
+                }
                 OpenPositionResponse mt5Resp = metaTraderService.openPosition(
                         new OpenPositionRequest(pair, direction, marginUsdt));
                 return ResponseEntity.ok()
@@ -272,9 +287,9 @@ public class FuturesController {
             String pair = body.containsKey("pair") ? (String) body.get("pair") : (String) body.get("market");
             String marginMode = (String) body.get("margin_currency_short_name");
 
-            // -- MT5 routing: triggered by explicit MT5 margin mode OR an enabled MT5 symbol pair --
+            // -- MT5 routing: triggered by explicit MT5 margin mode OR an MT5 symbol pair --
             if ("MT5".equalsIgnoreCase(marginMode) || "METATRADER".equalsIgnoreCase(marginMode)
-                    || (pair != null && !pair.isBlank() && metaTraderSymbolService.isSymbolEnabled(pair))) {
+                    || (pair != null && !pair.isBlank() && isMt5Pair(pair))) {
                 String symbolFilter = (pair != null && !pair.isBlank()) ? pair : null;
                 List<Object> mt5Orders = metaTraderService.getOrders(symbolFilter);
                 return ResponseEntity.ok()
@@ -309,9 +324,9 @@ public class FuturesController {
             String pair = body.containsKey("pair") ? (String) body.get("pair") : (String) body.get("market");
             String marginMode = (String) body.get("margin_currency_short_name");
 
-            // -- MT5 routing: triggered by explicit MT5 margin mode OR an enabled MT5 symbol pair --
+            // -- MT5 routing: triggered by explicit MT5 margin mode OR an MT5 symbol pair --
             if ("MT5".equalsIgnoreCase(marginMode) || "METATRADER".equalsIgnoreCase(marginMode)
-                    || (pair != null && !pair.isBlank() && metaTraderSymbolService.isSymbolEnabled(pair))) {
+                    || (pair != null && !pair.isBlank() && isMt5Pair(pair))) {
                 String symbolFilter = (pair != null && !pair.isBlank()) ? pair : null;
                 List<Object> mt5Positions = metaTraderService.getPositions(symbolFilter);
                 return ResponseEntity.ok()
@@ -406,11 +421,29 @@ public class FuturesController {
                         .header("Content-Type", "application/json")
                         .body(objectMapper.writeValueAsString(mt5Resp));
             }
-            if (pair != null && !pair.isBlank() && metaTraderSymbolService.isSymbolEnabled(pair)) {
-                return ResponseEntity.badRequest()
+            if (pair != null && !pair.isBlank() && isMt5Pair(pair)) {
+                // Auto-resolve: find the first open MT5 position for this symbol
+                @SuppressWarnings("unchecked")
+                List<Object> positions = metaTraderService.getPositions(pair);
+                if (positions == null || positions.isEmpty()) {
+                    return ResponseEntity.badRequest()
+                            .header("Content-Type", "application/json")
+                            .body("{\"error\":\"No open MT5 position found for symbol: " + pair
+                                    + ". Provide the 'ticket' field explicitly to close.\"}" );
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> firstPos = (Map<String, Object>) positions.get(0);
+                Object ticketRaw = firstPos.get("ticket");
+                if (ticketRaw == null) {
+                    return ResponseEntity.badRequest()
+                            .header("Content-Type", "application/json")
+                            .body("{\"error\":\"MT5 position for " + pair + " has no ticket field\"}");
+                }
+                Long resolvedTicket = Long.parseLong(ticketRaw.toString());
+                ClosePositionResponse mt5Resp = metaTraderService.closePosition(resolvedTicket);
+                return ResponseEntity.ok()
                         .header("Content-Type", "application/json")
-                        .body("{\"error\":\"MT5 position exit requires 'ticket' field. " +
-                              "Provide the MetaTrader position ticket to close.\"}");
+                        .body(objectMapper.writeValueAsString(mt5Resp));
             }
 
             // Resolve position id
@@ -468,15 +501,40 @@ public class FuturesController {
             String pair = body.containsKey("market") ? (String) body.get("market")
                     : (String) body.get("pair");
 
-            // -- MT5 routing: set TP/SL by ticket (MetaTrader positions use ticket IDs) --
-            if (body.containsKey("ticket")) {
-                Long ticket = Long.parseLong(body.get("ticket").toString());
-                Object tpRawMt5 = body.containsKey("target_price") ? body.get("target_price") : body.get("take_profit_price");
-                Object slRawMt5 = body.containsKey("stop_loss") ? body.get("stop_loss") : body.get("stop_loss_price");
+            // -- MT5 routing: set TP/SL by ticket, or auto-resolve ticket from open position by symbol --
+            Object tpRawMt5 = body.containsKey("target_price") ? body.get("target_price") : body.get("take_profit_price");
+            Object slRawMt5 = body.containsKey("stop_loss") ? body.get("stop_loss") : body.get("stop_loss_price");
+
+            boolean isMt5Symbol = pair != null && !pair.isBlank() && isMt5Pair(pair);
+            boolean hasTicket   = body.containsKey("ticket");
+
+            if (hasTicket || isMt5Symbol) {
+                Long ticket;
+                if (hasTicket) {
+                    ticket = Long.parseLong(body.get("ticket").toString());
+                } else {
+                    // Auto-resolve: find the first open MT5 position for this symbol
+                    List<Object> positions = metaTraderService.getPositions(pair);
+                    if (positions == null || positions.isEmpty()) {
+                        return ResponseEntity.badRequest()
+                                .header("Content-Type", "application/json")
+                                .body("{\"error\":\"No open MT5 position found for symbol: " + pair
+                                        + ". Cannot set TP/SL on a position that does not exist.\"}");
+                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> firstPos = (Map<String, Object>) positions.get(0);
+                    Object ticketRaw = firstPos.get("ticket");
+                    if (ticketRaw == null) {
+                        return ResponseEntity.badRequest()
+                                .header("Content-Type", "application/json")
+                                .body("{\"error\":\"MT5 position for " + pair + " has no ticket field\"}");
+                    }
+                    ticket = Long.parseLong(ticketRaw.toString());
+                }
                 if (tpRawMt5 == null && slRawMt5 == null) {
                     return ResponseEntity.badRequest()
                             .header("Content-Type", "application/json")
-                            .body("{\"error\":\"At least one of 'target_price' (TP) or 'stop_loss' (SL) must be provided for MT5 TP/SL\"}");
+                            .body("{\"error\":\"At least one of 'target_price'/'take_profit_price' (TP) or 'stop_loss'/'stop_loss_price' (SL) must be provided\"}");
                 }
                 Map<String, Object> mt5Resp = metaTraderService.setTpSl(new TpSlRequest(
                         ticket,
@@ -486,12 +544,6 @@ public class FuturesController {
                 return ResponseEntity.ok()
                         .header("Content-Type", "application/json")
                         .body(objectMapper.writeValueAsString(mt5Resp));
-            }
-            if (pair != null && !pair.isBlank() && metaTraderSymbolService.isSymbolEnabled(pair)) {
-                return ResponseEntity.badRequest()
-                        .header("Content-Type", "application/json")
-                        .body("{\"error\":\"MT5 TP/SL requires 'ticket' field. " +
-                              "Provide the MetaTrader position ticket.\"}");
             }
 
             // Resolve position id
@@ -948,5 +1000,18 @@ public class FuturesController {
                     .header("Content-Type", "application/json")
                     .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
         }
+    }
+
+    /**
+     * Returns true when {@code pair} should be routed to MetaTrader 5.
+     * Triggered when the symbol is registered & enabled in the local registry,
+     * OR when it clearly is not a CoinDCX pair (CoinDCX futures pairs always
+     * contain an underscore, e.g. "B-BTC_USDT"; MT5 symbols like "XAUUSD" do not).
+     */
+    private boolean isMt5Pair(String pair) {
+        if (pair == null || pair.isBlank()) return false;
+        if (metaTraderSymbolService.isSymbolEnabled(pair)) return true;
+        // CoinDCX pairs always contain '_'; no underscore → treat as MT5
+        return !pair.contains("_");
     }
 }

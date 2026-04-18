@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTradeConfig, DEFAULT_TRADE_CONFIG, TradeConfig } from '../context/TradeConfigContext';
+import { useTradeConfig, DEFAULT_TRADE_CONFIG, DEFAULT_MT5_CONFIG, TradeConfig, TradeConfigProfile } from '../context/TradeConfigContext';
 import { Save, RotateCcw, Settings2, TrendingUp, DollarSign, Shield } from 'lucide-react';
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -81,38 +81,63 @@ function NumField({
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const TradeConfigPage: React.FC = () => {
-  const { config, updateConfig } = useTradeConfig();
+const PROFILES: { id: TradeConfigProfile; label: string; color: string }[] = [
+  { id: 'coindcx', label: 'CoinDCX Futures', color: '#3b82f6' },
+  { id: 'mt5',     label: 'MT5 (XAUUSD / Metals)', color: '#f59e0b' },
+];
 
-  // Local draft — only commit on Save
-  const [draft, setDraft] = useState<TradeConfig>({ ...config });
+const TradeConfigPage: React.FC = () => {
+  const { coindcxConfig, mt5Config, updateConfig, resetConfig } = useTradeConfig();
+
+  const [activeProfile, setActiveProfile] = useState<TradeConfigProfile>('coindcx');
+  const [draftDcx,  setDraftDcx]  = useState<TradeConfig>({ ...coindcxConfig });
+  const [draftMt5,  setDraftMt5]  = useState<TradeConfig>({ ...mt5Config     });
   const [saved, setSaved] = useState(false);
+
+  const draft  = activeProfile === 'mt5' ? draftMt5  : draftDcx;
+  const setDraft = activeProfile === 'mt5'
+    ? (fn: (prev: TradeConfig) => TradeConfig) => setDraftMt5(fn)
+    : (fn: (prev: TradeConfig) => TradeConfig) => setDraftDcx(fn);
 
   const set = (field: keyof TradeConfig) => (v: number) =>
     setDraft(prev => ({ ...prev, [field]: v }));
 
   const handleSave = () => {
-    updateConfig(draft);
+    updateConfig(draft, activeProfile);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleReset = () => {
-    setDraft({ ...DEFAULT_TRADE_CONFIG });
+    if (activeProfile === 'mt5') {
+      setDraftMt5({ ...DEFAULT_MT5_CONFIG });
+      resetConfig('mt5');
+    } else {
+      setDraftDcx({ ...DEFAULT_TRADE_CONFIG });
+      resetConfig('coindcx');
+    }
   };
 
-  // Estimated TP/SL preview for display
-  const pipValue = 0.0001; // generic pip size; actual depends on contract
-  const tpUsd = (pips: number) => ((pips * pipValue * draft.marginUsdt * draft.leverage)).toFixed(2);
-  const slUsd  = ((draft.slPips * pipValue * draft.marginUsdt * draft.leverage)).toFixed(2);
+  const currentSaved = activeProfile === 'mt5' ? mt5Config : coindcxConfig;
+  const accentColor  = PROFILES.find(p => p.id === activeProfile)!.color;
+
+  // Estimated TP/SL preview (CoinDCX: margin-based; MT5: just pips)
+  const pipValue = 0.0001;
+  const tpUsd = (pips: number) =>
+    activeProfile === 'mt5'
+      ? `${pips}p`
+      : `${(pips * pipValue * draft.marginUsdt * draft.leverage).toFixed(2)} USDT`;
+  const slUsd = activeProfile === 'mt5'
+    ? `${draft.slPips}p`
+    : `${(draft.slPips * pipValue * draft.marginUsdt * draft.leverage).toFixed(2)} USDT`;
 
   return (
     <div className="page" style={{ maxWidth: 860, margin: '0 auto', padding: '1.25rem 1.5rem' }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <Settings2 size={22} style={{ color: '#3b82f6' }} />
+          <Settings2 size={22} style={{ color: accentColor }} />
           <h1 style={{ fontSize: '1.35rem', margin: 0 }}>Trade Configuration</h1>
         </div>
 
@@ -133,7 +158,7 @@ const TradeConfigPage: React.FC = () => {
             style={{
               display: 'flex', alignItems: 'center', gap: '0.35rem',
               padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none',
-              background: saved ? '#10b981' : '#3b82f6', color: '#fff',
+              background: saved ? '#10b981' : accentColor, color: '#fff',
               fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s',
             }}
           >
@@ -143,8 +168,32 @@ const TradeConfigPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Profile tabs ── */}
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', background: '#1e293b', padding: '0.25rem', borderRadius: '0.5rem', width: 'fit-content' }}>
+        {PROFILES.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setActiveProfile(p.id)}
+            style={{
+              padding: '0.45rem 1.1rem',
+              borderRadius: '0.35rem',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              transition: 'all 0.15s',
+              background: activeProfile === p.id ? p.color : 'transparent',
+              color: activeProfile === p.id ? '#fff' : '#64748b',
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-        These settings are saved locally and pre-filled on the Futures Trading page.
+        Configuring: <strong style={{ color: accentColor }}>{PROFILES.find(p => p.id === activeProfile)!.label}</strong>.
+        Settings are saved per-platform and pre-filled on each trading page.
         Changes only take effect after clicking <strong style={{ color: '#94a3b8' }}>Save</strong>.
       </p>
 
@@ -155,32 +204,59 @@ const TradeConfigPage: React.FC = () => {
           Position Sizing
         </div>
         <div style={rowStyle}>
-          <NumField
-            label="Margin per trade (USDT)"
-            hint="Amount of margin committed to each trade"
-            value={draft.marginUsdt}
-            min={1} step={1}
-            onChange={set('marginUsdt')}
-            accentColor="#f59e0b"
-          />
-          <NumField
-            label="Leverage"
-            hint="Position size = margin × leverage"
-            value={draft.leverage}
-            min={1} max={125} step={1}
-            onChange={set('leverage')}
-            accentColor="#f59e0b"
-          />
-          <div style={{ ...fieldStyle, justifyContent: 'center' }}>
-            <div style={labelStyle}>Notional position size</div>
-            <div style={{
-              fontSize: '1.3rem', fontWeight: 700, color: '#f59e0b',
-              padding: '0.45rem 0', letterSpacing: '-0.01em',
-            }}>
-              {(draft.marginUsdt * draft.leverage).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT
-            </div>
-            <div style={hintStyle}>{draft.marginUsdt} × {draft.leverage}×</div>
-          </div>
+          {activeProfile === 'mt5' ? (
+            <>
+              <NumField
+                label="Quantity per trade (lots)"
+                hint="Fixed number of lots/contracts per order"
+                value={draft.quantity}
+                min={0.001} step={0.001}
+                onChange={set('quantity')}
+                accentColor="#f59e0b"
+              />
+              <NumField
+                label="Leverage"
+                hint="Account leverage (used for margin calculation)"
+                value={draft.leverage}
+                min={1} max={2000} step={1}
+                onChange={set('leverage')}
+                accentColor="#f59e0b"
+              />
+              <div style={{ ...fieldStyle, justifyContent: 'center' }}>
+                <div style={labelStyle}>Trade size</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#f59e0b', padding: '0.45rem 0', letterSpacing: '-0.01em' }}>
+                  {draft.quantity} lots
+                </div>
+                <div style={hintStyle}>Fixed quantity per order</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <NumField
+                label="Margin per trade (USDT)"
+                hint="Amount of margin committed to each trade"
+                value={draft.marginUsdt}
+                min={1} step={1}
+                onChange={set('marginUsdt')}
+                accentColor="#f59e0b"
+              />
+              <NumField
+                label="Leverage"
+                hint="Position size = margin × leverage"
+                value={draft.leverage}
+                min={1} max={500} step={1}
+                onChange={set('leverage')}
+                accentColor="#f59e0b"
+              />
+              <div style={{ ...fieldStyle, justifyContent: 'center' }}>
+                <div style={labelStyle}>Notional position size</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#f59e0b', padding: '0.45rem 0', letterSpacing: '-0.01em' }}>
+                  {(draft.marginUsdt * draft.leverage).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT
+                </div>
+                <div style={hintStyle}>{draft.marginUsdt} × {draft.leverage}×</div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -193,7 +269,7 @@ const TradeConfigPage: React.FC = () => {
         <div style={rowStyle}>
           <NumField
             label="TP1 (pips)"
-            hint={`≈ +${tpUsd(draft.tp1Pips)} USDT profit`}
+            hint={`≈ +${tpUsd(draft.tp1Pips)}`}
             value={draft.tp1Pips}
             min={1} step={1}
             onChange={set('tp1Pips')}
@@ -201,7 +277,7 @@ const TradeConfigPage: React.FC = () => {
           />
           <NumField
             label="TP2 (pips)"
-            hint={`≈ +${tpUsd(draft.tp2Pips)} USDT profit`}
+            hint={`≈ +${tpUsd(draft.tp2Pips)}`}
             value={draft.tp2Pips}
             min={1} step={1}
             onChange={set('tp2Pips')}
@@ -209,7 +285,7 @@ const TradeConfigPage: React.FC = () => {
           />
           <NumField
             label="TP3 (pips)"
-            hint={`≈ +${tpUsd(draft.tp3Pips)} USDT profit`}
+            hint={`≈ +${tpUsd(draft.tp3Pips)}`}
             value={draft.tp3Pips}
             min={1} step={1}
             onChange={set('tp3Pips')}
@@ -225,7 +301,7 @@ const TradeConfigPage: React.FC = () => {
             { label: 'TP3', pips: draft.tp3Pips, h: 96 },
           ].map(({ label, pips, h }) => (
             <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700 }}>+{tpUsd(pips)} USDT</span>
+              <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700 }}>+{tpUsd(pips)}</span>
               <div style={{
                 width: 48, height: h,
                 background: 'linear-gradient(180deg, rgba(16,185,129,0.7) 0%, rgba(16,185,129,0.2) 100%)',
@@ -241,7 +317,7 @@ const TradeConfigPage: React.FC = () => {
 
           {/* SL bar */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', marginLeft: '1rem' }}>
-            <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 700 }}>−{slUsd} USDT</span>
+            <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 700 }}>−{slUsd}</span>
             <div style={{
               width: 48, height: 40,
               background: 'linear-gradient(0deg, rgba(239,68,68,0.7) 0%, rgba(239,68,68,0.2) 100%)',
@@ -265,7 +341,7 @@ const TradeConfigPage: React.FC = () => {
         <div style={rowStyle}>
           <NumField
             label="SL (pips)"
-            hint={`≈ −${slUsd} USDT risk`}
+            hint={`≈ −${slUsd}`}
             value={draft.slPips}
             min={1} step={1}
             onChange={set('slPips')}
@@ -299,15 +375,22 @@ const TradeConfigPage: React.FC = () => {
           Summary
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
-          {[
+          {(activeProfile === 'mt5' ? [
+            { label: 'Quantity', value: `${draft.quantity} lots`, color: '#f59e0b' },
+            { label: 'Leverage', value: `${draft.leverage}×`, color: '#f59e0b' },
+            { label: 'TP1', value: `+${draft.tp1Pips} pips`, color: '#10b981' },
+            { label: 'TP2', value: `+${draft.tp2Pips} pips`, color: '#10b981' },
+            { label: 'TP3', value: `+${draft.tp3Pips} pips`, color: '#10b981' },
+            { label: 'SL',  value: `−${draft.slPips} pips`, color: '#ef4444' },
+          ] : [
             { label: 'Margin', value: `${draft.marginUsdt} USDT`, color: '#f59e0b' },
             { label: 'Leverage', value: `${draft.leverage}×`, color: '#f59e0b' },
             { label: 'Position', value: `${(draft.marginUsdt * draft.leverage).toLocaleString()} USDT`, color: '#f1f5f9' },
-            { label: 'TP1', value: `+${draft.tp1Pips} pips / +${tpUsd(draft.tp1Pips)} USDT`, color: '#10b981' },
-            { label: 'TP2', value: `+${draft.tp2Pips} pips / +${tpUsd(draft.tp2Pips)} USDT`, color: '#10b981' },
-            { label: 'TP3', value: `+${draft.tp3Pips} pips / +${tpUsd(draft.tp3Pips)} USDT`, color: '#10b981' },
-            { label: 'SL',  value: `−${draft.slPips} pips / −${slUsd} USDT`, color: '#ef4444' },
-          ].map(({ label, value, color }) => (
+            { label: 'TP1', value: `+${draft.tp1Pips} pips / +${tpUsd(draft.tp1Pips)}`, color: '#10b981' },
+            { label: 'TP2', value: `+${draft.tp2Pips} pips / +${tpUsd(draft.tp2Pips)}`, color: '#10b981' },
+            { label: 'TP3', value: `+${draft.tp3Pips} pips / +${tpUsd(draft.tp3Pips)}`, color: '#10b981' },
+            { label: 'SL',  value: `−${draft.slPips} pips / −${slUsd}`, color: '#ef4444' },
+          ]).map(({ label, value, color }) => (
             <div key={label}>
               <div style={{ fontSize: '0.72rem', color: '#475569', marginBottom: '0.15rem' }}>{label}</div>
               <div style={{ fontSize: '0.9rem', fontWeight: 700, color }}>{value}</div>
@@ -317,21 +400,21 @@ const TradeConfigPage: React.FC = () => {
       </div>
 
       {/* Unsaved changes indicator */}
-      {JSON.stringify(draft) !== JSON.stringify(config) && !saved && (
+      {JSON.stringify(draft) !== JSON.stringify(currentSaved) && !saved && (
         <div style={{
           position: 'fixed', bottom: '1.5rem', right: '1.5rem',
-          background: '#1e293b', border: '1px solid #f59e0b',
+          background: '#1e293b', border: `1px solid ${accentColor}`,
           borderRadius: '0.5rem', padding: '0.6rem 1rem',
           display: 'flex', alignItems: 'center', gap: '0.75rem',
           boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-          fontSize: '0.85rem', color: '#f59e0b',
+          fontSize: '0.85rem', color: accentColor,
         }}>
           Unsaved changes
           <button
             onClick={handleSave}
             style={{
               padding: '0.3rem 0.7rem', borderRadius: '0.25rem', border: 'none',
-              background: '#f59e0b', color: '#0f172a', fontWeight: 700,
+              background: accentColor, color: '#0f172a', fontWeight: 700,
               fontSize: '0.8rem', cursor: 'pointer',
             }}
           >

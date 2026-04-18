@@ -78,7 +78,7 @@ public interface MetaTraderClient {
      * @param search optional case-insensitive substring filter (e.g. "XAU")
      */
     @GetMapping("/symbols")
-    List<Object> getSymbols(@RequestParam(value = "search", required = false) String search);
+    Map<String, Object> getSymbols(@RequestParam(value = "search", required = false) String search);
 
     /**
      * Raw tick data – GET /ticks
@@ -90,7 +90,7 @@ public interface MetaTraderClient {
      * @param to        end timestamp YYYY-MM-DDTHH:MM:SS
      */
     @GetMapping("/ticks")
-    List<Object> getTicks(
+    Map<String, Object> getTicks(
             @RequestParam("symbol") String symbol,
             @RequestParam(value = "count", required = false) Integer count,
             @RequestParam(value = "flags", required = false) String flags,
@@ -107,7 +107,7 @@ public interface MetaTraderClient {
      * @param to        end date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS
      */
     @GetMapping("/candlesticks")
-    List<Object> getCandlesticks(
+    Map<String, Object> getCandlesticks(
             @RequestParam("symbol") String symbol,
             @RequestParam(value = "timeframe", required = false) String timeframe,
             @RequestParam(value = "count", required = false) Integer count,
@@ -124,7 +124,7 @@ public interface MetaTraderClient {
      * @param symbol optional symbol filter, e.g. XAUUSD
      */
     @GetMapping("/positions")
-    List<Object> getPositions(@RequestParam(value = "symbol", required = false) String symbol);
+    Map<String, Object> getPositions(@RequestParam(value = "symbol", required = false) String symbol);
 
     /**
      * All pending orders – GET /orders
@@ -132,7 +132,7 @@ public interface MetaTraderClient {
      * @param symbol optional symbol filter, e.g. XAUUSD
      */
     @GetMapping("/orders")
-    List<Object> getOrders(@RequestParam(value = "symbol", required = false) String symbol);
+    Map<String, Object> getOrders(@RequestParam(value = "symbol", required = false) String symbol);
 
     /**
      * Open a market position – POST /trade/open
@@ -178,7 +178,7 @@ public interface MetaTraderClient {
      * @param symbol optional symbol filter
      */
     @GetMapping("/history/trades")
-    List<Object> getHistoryTrades(
+    Map<String, Object> getHistoryTrades(
             @RequestParam(value = "from", required = false) String from,
             @RequestParam(value = "to", required = false) String to,
             @RequestParam(value = "symbol", required = false) String symbol);
@@ -191,7 +191,7 @@ public interface MetaTraderClient {
      * @param symbol optional symbol filter
      */
     @GetMapping("/history/pnl")
-    List<Object> getHistoryPnl(
+    Map<String, Object> getHistoryPnl(
             @RequestParam(value = "from", required = false) String from,
             @RequestParam(value = "to", required = false) String to,
             @RequestParam(value = "symbol", required = false) String symbol);

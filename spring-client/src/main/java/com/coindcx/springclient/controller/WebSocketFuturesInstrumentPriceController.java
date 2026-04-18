@@ -1,7 +1,13 @@
 package com.coindcx.springclient.controller;
 
 import com.coindcx.springclient.entity.WebSocketFuturesInstrumentPrice;
+import com.coindcx.springclient.model.MarketDataTradeHistoryGet200ResponseInner;
 import com.coindcx.springclient.service.FuturesInstrumentPriceParsingService;
+import com.coindcx.springclient.service.MetaTraderService;
+import com.coindcx.springclient.service.MetaTraderSymbolService;
+import com.coindcx.springclient.service.PublicService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +27,21 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class WebSocketFuturesInstrumentPriceController {
 
-    private final FuturesInstrumentPriceParsingService parsingService;
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketFuturesInstrumentPriceController.class);
 
-    public WebSocketFuturesInstrumentPriceController(FuturesInstrumentPriceParsingService parsingService) {
+    private final FuturesInstrumentPriceParsingService parsingService;
+    private final MetaTraderService metaTraderService;
+    private final MetaTraderSymbolService metaTraderSymbolService;
+    private final PublicService publicService;
+
+    public WebSocketFuturesInstrumentPriceController(FuturesInstrumentPriceParsingService parsingService,
+                                                      MetaTraderService metaTraderService,
+                                                      MetaTraderSymbolService metaTraderSymbolService,
+                                                      PublicService publicService) {
         this.parsingService = parsingService;
+        this.metaTraderService = metaTraderService;
+        this.metaTraderSymbolService = metaTraderSymbolService;
+        this.publicService = publicService;
     }
 
     /**
@@ -46,14 +63,50 @@ public class WebSocketFuturesInstrumentPriceController {
      */
     @GetMapping("/instrument/{instrument}/latest")
     public ResponseEntity<?> getLatestPrice(@PathVariable String instrument) {
+        // 1. Try CoinDCX WebSocket DB (prefers records with non-null markPrice)
         WebSocketFuturesInstrumentPrice latestPrice = parsingService.getLatestPrice(instrument);
-        
         if (latestPrice != null) {
             return ResponseEntity.ok(latestPrice);
         }
-        
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body("No price data found for instrument: " + instrument);
+
+        // 2. Fall back to CoinDCX trade-history REST API for exchange pairs (contain '_')
+        //    Uses a per-symbol call (limit=1) so it's fast.
+        //    WebSocket continues running in the background; this is just an immediate response.
+        if (instrument.contains("_")) {
+            try {
+                List<MarketDataTradeHistoryGet200ResponseInner> trades =
+                        publicService.getTradeHistory(instrument, 1);
+                if (trades != null && !trades.isEmpty()) {
+                    MarketDataTradeHistoryGet200ResponseInner last = trades.get(0);
+                    Map<String, Object> response = new LinkedHashMap<>();
+                    response.put("instrument", instrument);
+                    response.put("markPrice", last.getP());
+                    response.put("eventTimestamp", last.getT() != null
+                            ? (long) last.getT() * 1000L : null);
+                    response.put("productType", "futures");
+                    response.put("source", "rest_api_fallback");
+                    return ResponseEntity.ok(response);
+                }
+            } catch (Exception e) {
+                logger.warn("REST trade-history fallback failed for {}: {}", instrument, e.getMessage());
+            }
+        }
+
+        // 3. Fall back to MT5 ticks (handles XAUUSD, EURUSD and other MT5 symbols without '_')
+        String mt5Error = null;
+        try {
+            List<Object> ticks = metaTraderService.getTicks(instrument, 1, null, null, null);
+            if (ticks != null && !ticks.isEmpty()) {
+                return ResponseEntity.ok(ticks.get(0));
+            }
+        } catch (Exception e) {
+            mt5Error = e.getMessage();
+        }
+
+        Map<String, Object> notFound = new java.util.LinkedHashMap<>();
+        notFound.put("error", "No price data found for instrument: " + instrument);
+        if (mt5Error != null) notFound.put("mt5_error", mt5Error);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(notFound);
     }
 
     /**
