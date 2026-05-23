@@ -4,15 +4,20 @@ import com.coindcx.springclient.client.ApiException;
 import com.coindcx.springclient.model.ExchangeV1UsersBalancesPost200ResponseInner;
 import com.coindcx.springclient.model.ExchangeV1UsersBalancesPostRequest;
 import com.coindcx.springclient.model.ExchangeV1UsersInfoPost200Response;
+import com.coindcx.springclient.service.MetaTraderService;
 import com.coindcx.springclient.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for User account operations
@@ -25,14 +30,18 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final MetaTraderService metaTraderService;
+    private final ObjectMapper objectMapper;
 
     @Autowired
-    public UserController(UserService userService) {
+    public UserController(UserService userService, MetaTraderService metaTraderService, ObjectMapper objectMapper) {
         this.userService = userService;
+        this.metaTraderService = metaTraderService;
+        this.objectMapper = objectMapper;
     }
 
     /**
-     * Get account balances
+     * Get spot account balances
      * 
      * @param request Balance request with timestamp
      * @return List of account balances
@@ -49,19 +58,65 @@ public class UserController {
     }
 
     /**
-     * Get user account information
-     * 
-     * @param request User info request with timestamp
-     * @return User account info
+     * Get merged user account information from CoinDCX and MT5.
+     * Always fetches from both sources.
+     * Returns: { "coindcx": {...}, "mt5": {...} } with optional error fields if a source fails.
      */
     @PostMapping("/info")
-    public ResponseEntity<ExchangeV1UsersInfoPost200Response> getUserInfo(
+    @Operation(summary = "Get merged CoinDCX and MT5 account info",
+               description = "Fetches CoinDCX user account info and MetaTrader 5 full account snapshot simultaneously, "
+                       + "merging them into { \"coindcx\": {...}, \"mt5\": {...} }. "
+                       + "If a source fails, its error is included in 'coindcx_error' or 'mt5_error' "
+                       + "and the other source result is still returned.")
+    public ResponseEntity<String> getUserInfo(
             @RequestBody ExchangeV1UsersBalancesPostRequest request) {
         try {
-            ExchangeV1UsersInfoPost200Response userInfo = userService.getUserInfo(request);
-            return ResponseEntity.ok(userInfo);
-        } catch (ApiException e) {
-            return ResponseEntity.status(e.getCode()).body(null);
+            // --- CoinDCX user info ---
+            Object coindcxInfo = null;
+            String coindcxError = null;
+            try {
+                coindcxInfo = userService.getUserInfo(request);
+            } catch (ApiException e) {
+                coindcxError = e.getMessage();
+            } catch (Exception e) {
+                coindcxError = e.getMessage();
+            }
+
+            // --- MT5 account snapshot ---
+            Object mt5Account = null;
+            String mt5Error = null;
+            try {
+                mt5Account = metaTraderService.getAccount();
+            } catch (Exception e) {
+                mt5Error = e.getMessage();
+            }
+
+            // Build merged response
+            Map<String, Object> merged = new LinkedHashMap<>();
+            merged.put("coindcx", coindcxInfo != null ? coindcxInfo : new LinkedHashMap<>());
+            merged.put("mt5", mt5Account != null ? mt5Account : new LinkedHashMap<>());
+            if (coindcxError != null) merged.put("coindcx_error", coindcxError);
+            if (mt5Error != null) merged.put("mt5_error", mt5Error);
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/json")
+                    .body(objectMapper.writeValueAsString(merged));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
         }
     }
+
+    // -------------------------------------------------------------------------
+    // MetaTrader 5 – Gateway
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/mt5/health")
+    @Operation(summary = "MT5 gateway liveness check",
+               description = "Verifies the MetaTrader 5 gateway is reachable.")
+    public ResponseEntity<Map<String, Object>> mt5Health() {
+        return ResponseEntity.ok(metaTraderService.health());
+    }
+
 }

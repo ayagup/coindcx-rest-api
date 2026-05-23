@@ -1,0 +1,753 @@
+{
+  "basePath": "/",
+  "consumes": [
+    "application/json"
+  ],
+  "definitions": {
+    "Error": {
+      "properties": {
+        "error": {
+          "example": "symbol is required",
+          "type": "string"
+        },
+        "ok": {
+          "example": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "OpenPositionBody": {
+      "properties": {
+        "direction": {
+          "default": "long",
+          "enum": [
+            "long",
+            "short"
+          ],
+          "example": "long",
+          "type": "string"
+        },
+        "margin_usdt": {
+          "example": 5.0,
+          "type": "number"
+        },
+        "symbol": {
+          "example": "XAUUSD",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol"
+      ],
+      "type": "object"
+    },
+    "TpSlBody": {
+      "properties": {
+        "sl": {
+          "example": 3400.0,
+          "type": "number"
+        },
+        "ticket": {
+          "example": 123456789,
+          "type": "integer"
+        },
+        "tp": {
+          "example": 3500.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "ticket"
+      ],
+      "type": "object"
+    }
+  },
+  "info": {
+    "description": "Flask REST API that wraps the MetaTrader 5 Python SDK.",
+    "title": "MetaTrader 5 REST Gateway",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/account": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Account info returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Full MT5 account snapshot.",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/account/balance": {
+      "get": {
+        "description": "Returns balance, equity, margin, free_margin, margin_level, and floating profit.",
+        "responses": {
+          "200": {
+            "description": "Balance returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Wallet balance details.",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/account/leverage": {
+      "get": {
+        "description": "Returns leverage as an integer and as a display string e.g. \"1:50\".",
+        "responses": {
+          "200": {
+            "description": "Leverage returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Account leverage.",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/candlesticks": {
+      "get": {
+        "description": "Returns OHLCV bars for the given symbol and timeframe.\nWhen 'from' is omitted the latest 'count' bars are returned.\nSupported timeframes: M1 M2 M3 M4 M5 M6 M10 M12 M15 M20 M30 H1 H2 H3 H4 H6 H8 H12 D1 W1 MN1.\n",
+        "parameters": [
+          {
+            "description": "Symbol name, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "default": "H1",
+            "description": "Timeframe (default H1)",
+            "in": "query",
+            "name": "timeframe",
+            "type": "string"
+          },
+          {
+            "default": 100,
+            "description": "Number of bars (default 100, max 5000)",
+            "in": "query",
+            "name": "count",
+            "type": "integer"
+          },
+          {
+            "description": "Start date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS",
+            "in": "query",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "description": "End date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS",
+            "in": "query",
+            "name": "to",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candlestick bars returned"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "OHLCV candlestick bars for a symbol.",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Server is alive",
+            "schema": {
+              "properties": {
+                "status": {
+                  "example": "ok",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Liveness check.",
+        "tags": [
+          "Utility"
+        ]
+      }
+    },
+    "/history/pnl": {
+      "get": {
+        "description": "Aggregates deals by position ID and returns net PnL per closed position.",
+        "parameters": [
+          {
+            "description": "Start date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default 30 days ago)",
+            "in": "query",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "description": "End date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default now)",
+            "in": "query",
+            "name": "to",
+            "type": "string"
+          },
+          {
+            "description": "Optional symbol filter, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PnL summary returned"
+          },
+          "400": {
+            "description": "Invalid date format",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Closed-position PnL summary.",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/history/trades": {
+      "get": {
+        "description": "Returns all executed deals in the given date range.",
+        "parameters": [
+          {
+            "description": "Start date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default 30 days ago)",
+            "in": "query",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "description": "End date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default now)",
+            "in": "query",
+            "name": "to",
+            "type": "string"
+          },
+          {
+            "description": "Optional symbol filter, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deal list returned"
+          },
+          "400": {
+            "description": "Invalid date format",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Executed deal log.",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/orders": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Filter by symbol, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order list returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "All pending orders.",
+        "tags": [
+          "Trading"
+        ]
+      }
+    },
+    "/positions": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Filter by symbol, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Position list returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "All open positions.",
+        "tags": [
+          "Trading"
+        ]
+      }
+    },
+    "/symbols": {
+      "get": {
+        "description": "Returns all symbols available on the broker. Use ?search= for a substring filter.",
+        "parameters": [
+          {
+            "description": "Case-insensitive substring filter, e.g. XAU",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Symbol list returned"
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "All tradable symbols.",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/ticks": {
+      "get": {
+        "description": "Returns raw ticks for the given symbol.\nWhen 'from' is omitted the latest 'count' ticks are returned.\nWhen 'from' alone is given, 'count' ticks starting from that timestamp.\nWhen both 'from' and 'to' are given, all ticks in that range.\n",
+        "parameters": [
+          {
+            "description": "Symbol name, e.g. XAUUSD",
+            "in": "query",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "default": 100,
+            "description": "Number of ticks (default 100, max 10000)",
+            "in": "query",
+            "name": "count",
+            "type": "integer"
+          },
+          {
+            "default": "all",
+            "description": "Tick type filter (default all)",
+            "enum": [
+              "all",
+              "info",
+              "trade"
+            ],
+            "in": "query",
+            "name": "flags",
+            "type": "string"
+          },
+          {
+            "description": "Start timestamp YYYY-MM-DDTHH:MM:SS",
+            "in": "query",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "description": "End timestamp YYYY-MM-DDTHH:MM:SS",
+            "in": "query",
+            "name": "to",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tick list returned"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Raw tick data for a symbol.",
+        "tags": [
+          "Market Data"
+        ]
+      }
+    },
+    "/trade/close": {
+      "post": {
+        "description": "Closes the open position identified by ticket by sending a market order\nin the opposite direction, then cancels every pending order on the same symbol.\n",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "ticket": {
+                  "description": "Ticket of the open position to close",
+                  "example": 123456789,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "ticket"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Position closed",
+            "schema": {
+              "properties": {
+                "close_price": {
+                  "type": "number"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "orders_cancelled": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "symbol": {
+                  "type": "string"
+                },
+                "ticket": {
+                  "type": "integer"
+                },
+                "volume": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 order rejected",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Close an open position and cancel all pending orders on the same symbol.",
+        "tags": [
+          "Trading"
+        ]
+      }
+    },
+    "/trade/open": {
+      "post": {
+        "description": "Opens a BUY or SELL market order using a margin-based lot calculation.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OpenPositionBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Position opened",
+            "schema": {
+              "properties": {
+                "lot": {
+                  "type": "number"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "price": {
+                  "type": "number"
+                },
+                "ticket": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 order rejected",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Open a market position on any symbol.",
+        "tags": [
+          "Trading"
+        ]
+      }
+    },
+    "/trade/open-long-xauusd": {
+      "post": {
+        "description": "Kept for backward compatibility. Prefer POST /trade/open.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "properties": {
+                "margin_usdt": {
+                  "example": 5.0,
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Position opened"
+          },
+          "400": {
+            "description": "Validation error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 order rejected",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Open XAUUSD long \u2014 legacy endpoint.",
+        "tags": [
+          "Trading (Legacy)"
+        ]
+      }
+    },
+    "/trade/tpsl": {
+      "post": {
+        "description": "Modifies take-profit and/or stop-loss of an open position. Omit a field to leave it unchanged.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/TpSlBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TP/SL updated"
+          },
+          "400": {
+            "description": "Validation error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "502": {
+            "description": "MT5 order rejected",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "503": {
+            "description": "Cannot connect to MT5",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "summary": "Set or update TP and SL on an open position.",
+        "tags": [
+          "Trading"
+        ]
+      }
+    }
+  },
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "swagger": "2.0"
+}

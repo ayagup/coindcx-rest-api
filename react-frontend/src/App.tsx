@@ -7,7 +7,8 @@ import MarketPage from './pages/MarketPage';
 import LoginPage from './pages/LoginPage';
 import WebSocketPage from './pages/WebSocketPage';
 import ChartPage from './pages/ChartPage';
-import FuturesTradingPage from './pages/FuturesTradingPage';
+import CoinDCXTradingPage from './pages/CoinDCXTradingPage';
+import MT5TradingPage from './pages/MT5TradingPage';
 import TradeConfigPage from './pages/TradeConfigPage';
 import TradeLogPage from './pages/TradeLogPage';
 import './App.css';
@@ -35,7 +36,8 @@ const AppRoutes: React.FC = () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/futures" element={<FuturesTradingPage />} />
+          <Route path="/futures" element={<CoinDCXTradingPage />} />
+          <Route path="/mt5" element={<MT5TradingPage />} />
           <Route path="/trade-config" element={<TradeConfigPage />} />
           <Route path="/trade-log" element={<TradeLogPage />} />
           <Route

@@ -3,6 +3,7 @@ package com.coindcx.springclient.controller;
 import com.coindcx.springclient.config.WebSocketConfig;
 import com.coindcx.springclient.model.WebSocketBalanceUpdateData;
 import com.coindcx.springclient.repository.WebSocketBalanceUpdateDataRepository;
+import com.coindcx.springclient.service.MetaTraderService;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -44,6 +45,9 @@ public class WebSocketBalanceUpdateController {
 
     @Autowired
     private WebSocketConfig webSocketConfig;
+
+    @Autowired
+    private MetaTraderService metaTraderService;
 
     private final OkHttpClient httpClient = new OkHttpClient();
 
@@ -111,21 +115,37 @@ public class WebSocketBalanceUpdateController {
     }
 
     /**
-     * Get latest balance for a currency.
-     * Priority: (1) futures wallet API — real trading balance,
-     *            (2) spot balances API,
-     *            (3) most recent DB record.
+     * Get current balance for a currency from both sources:
+     * 1) CoinDCX futures wallet (primary) / spot balances REST API (fallback) / DB (last resort)
+     * 2) MetaTrader 5 account balance
+     *
+     * Returns: { "futures": {...}, "mt5": {...} } with optional *_error keys on failure.
      */
     @GetMapping("/currency/{currency}/current")
-    public ResponseEntity<WebSocketBalanceUpdateData> getLatestBalanceForCurrency(@PathVariable String currency) {
-        WebSocketBalanceUpdateData data = fetchFromFuturesWalletApi(currency);
-        if (data == null) {
-            data = fetchFromRestApi(currency);
+    public ResponseEntity<Map<String, Object>> getLatestBalanceForCurrency(@PathVariable String currency) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+
+        // ── 1. Futures / spot balance ─────────────────────────────────────────
+        try {
+            WebSocketBalanceUpdateData data = fetchFromFuturesWalletApi(currency);
+            if (data == null) data = fetchFromRestApi(currency);
+            if (data == null) data = repository.findFirstByCurrencyShortNameOrderByRecordTimestampDesc(currency);
+            result.put("futures", data);
+        } catch (Exception e) {
+            result.put("futures", null);
+            result.put("futures_error", e.getMessage());
         }
-        if (data == null) {
-            data = repository.findFirstByCurrencyShortNameOrderByRecordTimestampDesc(currency);
+
+        // ── 2. MT5 balance ────────────────────────────────────────────────────
+        try {
+            Map<String, Object> mt5Balance = metaTraderService.getBalance();
+            result.put("mt5", mt5Balance);
+        } catch (Exception e) {
+            result.put("mt5", null);
+            result.put("mt5_error", e.getMessage());
         }
-        return ResponseEntity.ok(data);
+
+        return ResponseEntity.ok(result);
     }
 
     /**

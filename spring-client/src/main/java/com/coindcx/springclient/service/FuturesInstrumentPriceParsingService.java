@@ -142,6 +142,34 @@ public class FuturesInstrumentPriceParsingService {
      */
     public WebSocketFuturesInstrumentPrice getLatestPrice(String instrument) {
         try {
+            // Prefer the most recent record that actually has a markPrice set.
+            // WebSocket events sometimes arrive without the "mp" field; using those
+            // would return markPrice: null even though fresher priced data exists.
+            List<WebSocketFuturesInstrumentPrice> withPrice =
+                    instrumentPriceRepository.findByInstrumentWithMarkPrice(instrument);
+            if (withPrice != null && !withPrice.isEmpty()) {
+                // findByInstrumentWithMarkPrice is already ordered by eventTimestamp DESC
+                WebSocketFuturesInstrumentPrice best = withPrice.get(0);
+                // Merge: overlay any later timestamp-only event so versionSequence/eventTimestamp
+                // reflect the most recent update while keeping the real markPrice.
+                instrumentPriceRepository.findFirstByInstrumentOrderByEventTimestampDesc(instrument)
+                        .ifPresent(latest -> {
+                            if (latest.getEventTimestamp() != null
+                                    && (best.getEventTimestamp() == null
+                                        || latest.getEventTimestamp() > best.getEventTimestamp())) {
+                                best.setEventTimestamp(latest.getEventTimestamp());
+                                best.setVersionSequence(latest.getVersionSequence());
+                                if (latest.getBenchmarkTimestamp() != null) {
+                                    best.setBenchmarkTimestamp(latest.getBenchmarkTimestamp());
+                                }
+                                if (latest.getCalculatedMarkTimestamp() != null) {
+                                    best.setCalculatedMarkTimestamp(latest.getCalculatedMarkTimestamp());
+                                }
+                            }
+                        });
+                return best;
+            }
+            // Fall back: return the freshest record even if markPrice is null
             return instrumentPriceRepository.findFirstByInstrumentOrderByEventTimestampDesc(instrument)
                     .orElse(null);
         } catch (Exception e) {

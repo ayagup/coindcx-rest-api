@@ -2,8 +2,14 @@ package com.coindcx.springclient.controller;
 
 import com.coindcx.springclient.client.ApiException;
 import com.coindcx.springclient.model.*;
+import com.coindcx.springclient.model.metatrader.OpenPositionRequest;
+import com.coindcx.springclient.model.metatrader.OpenPositionResponse;
+import com.coindcx.springclient.service.MetaTraderService;
+import com.coindcx.springclient.service.MetaTraderSymbolService;
 import com.coindcx.springclient.service.OrderService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Order management operations
@@ -23,10 +30,19 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final MetaTraderService metaTraderService;
+    private final MetaTraderSymbolService metaTraderSymbolService;
+    private final ObjectMapper objectMapper;
 
     @Autowired
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService,
+                           MetaTraderService metaTraderService,
+                           MetaTraderSymbolService metaTraderSymbolService,
+                           ObjectMapper objectMapper) {
         this.orderService = orderService;
+        this.metaTraderService = metaTraderService;
+        this.metaTraderSymbolService = metaTraderSymbolService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -138,13 +154,32 @@ public class OrderController {
      * @return Order creation response
      */
     @PostMapping("/create")
-    public ResponseEntity<ExchangeV1OrdersCreatePost200Response> createOrder(
+    public ResponseEntity<Object> createOrder(
             @RequestBody ExchangeV1OrdersCreatePostRequest request) {
         try {
+            // -- MT5 routing: if market is a registered MetaTrader symbol, open MT5 position --
+            String market = request.getMarket();
+            if (market != null && metaTraderSymbolService.isSymbolEnabled(market)) {
+                String direction;
+                if (request.getSide() != null && "SELL".equalsIgnoreCase(request.getSide().toString())) {
+                    direction = "short";
+                } else {
+                    direction = "long";
+                }
+                OpenPositionResponse mt5Resp = metaTraderService.openPosition(
+                        new OpenPositionRequest(market, direction, null));
+                return ResponseEntity.ok()
+                        .header("Content-Type", "application/json")
+                        .body(objectMapper.writeValueAsString(mt5Resp));
+            }
             ExchangeV1OrdersCreatePost200Response response = orderService.createOrder(request);
             return ResponseEntity.ok(response);
         } catch (ApiException e) {
-            return ResponseEntity.status(e.getCode()).body(null);
+            return ResponseEntity.status(e.getCode() > 0 ? e.getCode() : 500).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}");
         }
     }
 
@@ -215,4 +250,5 @@ public class OrderController {
             return ResponseEntity.status(e.getCode()).body(null);
         }
     }
+
 }

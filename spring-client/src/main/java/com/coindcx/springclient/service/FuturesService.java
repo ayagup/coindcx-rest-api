@@ -267,19 +267,91 @@ public class FuturesService {
     /**
      * Get position transactions
      * @param request Transactions fetch request
+     * @return raw JSON response from CoinDCX (array of transactions)
      * @throws ApiException if the API call fails
      */
-    public void getPositionTransactions(ExchangeV1DerivativesFuturesPositionsTransactionsPostRequest request) throws ApiException {
-        futuresApi.exchangeV1DerivativesFuturesPositionsTransactionsPost(request);
+    public String getPositionTransactions(ExchangeV1DerivativesFuturesPositionsTransactionsPostRequest request) throws ApiException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", request.getTimestamp() != null ? request.getTimestamp() : System.currentTimeMillis());
+        if (request.getStage() != null)                    body.put("stage", request.getStage().getValue());
+        if (request.getPage() != null)                     body.put("page", request.getPage());
+        if (request.getSize() != null)                     body.put("size", request.getSize());
+        if (request.getMarginCurrencyShortName() != null)  body.put("margin_currency_short_name", request.getMarginCurrencyShortName());
+
+        Map<String, String> headerParams = new HashMap<>();
+        headerParams.put("Content-Type", "application/json");
+        headerParams.put("Accept", "application/json");
+
+        Call call = futuresApi.getApiClient().buildCall(
+                null,
+                "/exchange/v1/derivatives/futures/positions/transactions",
+                "POST",
+                new ArrayList<>(),
+                new ArrayList<>(),
+                body,
+                headerParams,
+                new HashMap<>(),
+                new HashMap<>(),
+                new String[]{"ApiKeyAuth", "SignatureAuth"},
+                null
+        );
+
+        try (Response response = call.execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "[]";
+            if (!response.isSuccessful()) {
+                throw new ApiException(response.code(), "Position transactions request failed: " + responseBody);
+            }
+            return responseBody;
+        } catch (IOException e) {
+            throw new ApiException("IO error calling /exchange/v1/derivatives/futures/positions/transactions: " + e.getMessage());
+        }
     }
 
     /**
      * Get futures trades
      * @param request Trades fetch request
+     * @return raw JSON response from CoinDCX (array of trades)
      * @throws ApiException if the API call fails
      */
-    public void getTrades(ExchangeV1DerivativesFuturesTradesPostRequest request) throws ApiException {
-        futuresApi.exchangeV1DerivativesFuturesTradesPost(request);
+    public String getTrades(ExchangeV1DerivativesFuturesTradesPostRequest request) throws ApiException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", request.getTimestamp() != null ? request.getTimestamp() : System.currentTimeMillis());
+        if (request.getPair() != null) body.put("pair", request.getPair());
+        if (request.getOrderId() != null) body.put("order_id", request.getOrderId());
+        if (request.getFromDate() != null) body.put("from_date", request.getFromDate().toString());
+        if (request.getToDate() != null) body.put("to_date", request.getToDate().toString());
+        if (request.getPage() != null) body.put("page", request.getPage());
+        if (request.getSize() != null) body.put("size", request.getSize());
+        if (request.getMarginCurrencyShortName() != null)
+            body.put("margin_currency_short_name", request.getMarginCurrencyShortName());
+
+        Map<String, String> headerParams = new HashMap<>();
+        headerParams.put("Content-Type", "application/json");
+        headerParams.put("Accept", "application/json");
+
+        Call call = futuresApi.getApiClient().buildCall(
+                null,
+                "/exchange/v1/derivatives/futures/trades",
+                "POST",
+                new ArrayList<>(),
+                new ArrayList<>(),
+                body,
+                headerParams,
+                new HashMap<>(),
+                new HashMap<>(),
+                new String[]{"ApiKeyAuth", "SignatureAuth"},
+                null
+        );
+
+        try (Response response = call.execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "[]";
+            if (!response.isSuccessful()) {
+                throw new ApiException(response.code(), "Futures trades request failed: " + responseBody);
+            }
+            return responseBody;
+        } catch (IOException e) {
+            throw new ApiException("IO error calling /exchange/v1/derivatives/futures/trades: " + e.getMessage());
+        }
     }
 
     /**
@@ -404,6 +476,21 @@ public class FuturesService {
             }
         }
         return 0;
+    }
+
+    /**
+     * Get futures candlestick OHLCV data from CoinDCX.
+     * pcode is always "f" (futures). resolution examples: 1, 5, 15, 30, 60, 1D.
+     *
+     * @param pair       Trading pair, e.g. BTCUSDT
+     * @param from       Start timestamp (epoch ms)
+     * @param to         End timestamp (epoch ms)
+     * @param resolution Candle resolution string
+     * @return List of OHLCV bar objects
+     * @throws ApiException if the API call fails
+     */
+    public List<Object> getCandlesticks(String pair, Long from, Long to, String resolution) throws ApiException {
+        return futuresApi.marketDataCandlesticksGet(pair, from, to, resolution, "f");
     }
 
     /**

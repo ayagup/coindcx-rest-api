@@ -47,7 +47,12 @@ const Header: React.FC = () => {
               
               <Link to="/futures" className={isActive('/futures') ? 'nav-link active' : 'nav-link'}>
                 <BarChart3 size={18} />
-                <span>Futures</span>
+                <span>CoinDCX</span>
+              </Link>
+
+              <Link to="/mt5" className={isActive('/mt5') ? 'nav-link active' : 'nav-link'}>
+                <Activity size={18} />
+                <span>MT5</span>
               </Link>
               
               <Link to="/trade-log" className={isActive('/trade-log') ? 'nav-link active' : 'nav-link'}>

@@ -1,0 +1,689 @@
+{
+  "info": {
+    "name": "MetaTrader 5 REST Gateway",
+    "description": "Flask REST API that wraps the MetaTrader 5 Python SDK.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Utility",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness check — confirms the server is running."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Account",
+      "item": [
+        {
+          "name": "Full account snapshot",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/account",
+              "host": ["{{base_url}}"],
+              "path": ["account"]
+            },
+            "description": "Full MT5 account snapshot."
+          },
+          "response": []
+        },
+        {
+          "name": "Wallet balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/account/balance",
+              "host": ["{{base_url}}"],
+              "path": ["account", "balance"]
+            },
+            "description": "Returns balance, equity, margin, free_margin, margin_level, and floating profit."
+          },
+          "response": []
+        },
+        {
+          "name": "Account leverage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/account/leverage",
+              "host": ["{{base_url}}"],
+              "path": ["account", "leverage"]
+            },
+            "description": "Returns leverage as an integer and as a display string e.g. \"1:50\"."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trading",
+      "item": [
+        {
+          "name": "Open positions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/positions",
+              "host": ["{{base_url}}"],
+              "path": ["positions"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "",
+                  "description": "Filter by symbol, e.g. XAUUSD",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns all open positions. Optional ?symbol= filter."
+          },
+          "response": []
+        },
+        {
+          "name": "Pending orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "",
+                  "description": "Filter by symbol, e.g. XAUUSD",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns all pending orders. Optional ?symbol= filter."
+          },
+          "response": []
+        },
+        {
+          "name": "Open position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"XAUUSD\",\n  \"direction\": \"long\",\n  \"margin_usdt\": 5.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/open",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "open"]
+            },
+            "description": "Opens a BUY or SELL market order using a margin-based lot calculation.\n\n- `symbol` (required): e.g. XAUUSD\n- `direction`: `long` or `short` (default `long`)\n- `margin_usdt`: margin to allocate in account currency (default 5.0)"
+          },
+          "response": []
+        },
+        {
+          "name": "Set TP / SL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 123456789,\n  \"tp\": 3500.00,\n  \"sl\": 3400.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/tpsl",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "tpsl"]
+            },
+            "description": "Modifies take-profit and/or stop-loss of an open position. Omit `tp` or `sl` to leave that value unchanged."
+          },
+          "response": []
+        },
+        {
+          "name": "Close position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 123456789\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/close",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "close"]
+            },
+            "description": "Closes the open position by ticket using a market order in the opposite direction, then cancels all pending orders on the same symbol. Returns close_price, volume, and a list of cancelled order tickets."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel order",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 987654321\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/cancel-order",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "cancel-order"]
+            },
+            "description": "Cancels a single pending order (limit, stop, stop-limit, etc.) by ticket using TRADE_ACTION_REMOVE. Only works on pending orders — not open positions."
+          },
+          "response": []
+        },
+        {
+          "name": "Add margin to position",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 123456789,\n  \"margin_usdt\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/add-margin",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "add-margin"]
+            },
+            "description": "Extends an open position by opening an additional deal on the same symbol and direction, sized by margin_usdt. Returns added_volume, price, and the new_order ticket."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove margin from position",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 123456789,\n  \"margin_usdt\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/remove-margin",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "remove-margin"]
+            },
+            "description": "Partially closes an open position to free up the margin backing the specified margin_usdt. If the resulting remainder is below volume_min, the entire position is closed (fully_closed=true)."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel all orders for a position",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket\": 123456789\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/cancel-position-orders",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "cancel-position-orders"]
+            },
+            "description": "Resolves the position's symbol from ticket, then cancels every pending order on that symbol. Returns cancelled (success) and failed (error) ticket lists."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel all orders (all positions)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/cancel-all-orders",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "cancel-all-orders"]
+            },
+            "description": "Cancels every pending order across all open positions. No request body needed. Returns positions count, symbols scanned, and cancelled/failed ticket lists."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "History",
+      "item": [
+        {
+          "name": "Trade log (deals)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/history/trades",
+              "host": ["{{base_url}}"],
+              "path": ["history", "trades"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "description": "Start date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default: 30 days ago)",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13",
+                  "description": "End date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default: now)",
+                  "disabled": true
+                },
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Optional symbol filter",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns all executed deals in the given date range."
+          },
+          "response": []
+        },
+        {
+          "name": "PnL summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/history/pnl",
+              "host": ["{{base_url}}"],
+              "path": ["history", "pnl"],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "description": "Start date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default: 30 days ago)",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13",
+                  "description": "End date YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS (default: now)",
+                  "disabled": true
+                },
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Optional symbol filter",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Aggregates deals by position ID and returns net PnL per closed position."
+          },
+          "response": []
+        },
+        {
+          "name": "Position transaction history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/history/position?ticket=123456789",
+              "host": ["{{base_url}}"],
+              "path": ["history", "position"],
+              "query": [
+                {
+                  "key": "ticket",
+                  "value": "123456789",
+                  "description": "Position ticket (required)"
+                }
+              ]
+            },
+            "description": "Returns every deal linked to the given position ticket (history_deals_get by position_id). Covers opening fill, partial closes, swap/commission charges, and final close."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Market Data",
+      "item": [
+        {
+          "name": "Symbols list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/symbols",
+              "host": ["{{base_url}}"],
+              "path": ["symbols"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "XAU",
+                  "description": "Case-insensitive substring filter",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns only fully-tradeable symbols (SYMBOL_TRADE_MODE_FULL). Use ?search= for a substring filter."
+          },
+          "response": []
+        },
+        {
+          "name": "Candlesticks (latest N bars)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/candlesticks?symbol=XAUUSD&timeframe=H1&count=100",
+              "host": ["{{base_url}}"],
+              "path": ["candlesticks"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                },
+                {
+                  "key": "timeframe",
+                  "value": "H1",
+                  "description": "Timeframe: M1 M5 M15 M30 H1 H4 D1 W1 MN1 etc."
+                },
+                {
+                  "key": "count",
+                  "value": "100",
+                  "description": "Number of bars (max 5000)"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-04-01",
+                  "description": "Start date — enables date-range mode",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13",
+                  "description": "End date",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns the latest 100 H1 bars for XAUUSD. Enable `from`/`to` query params to switch to a date-range query."
+          },
+          "response": []
+        },
+        {
+          "name": "Candlesticks (date range)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/candlesticks?symbol=XAUUSD&timeframe=H1&from=2026-04-01&to=2026-04-13",
+              "host": ["{{base_url}}"],
+              "path": ["candlesticks"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                },
+                {
+                  "key": "timeframe",
+                  "value": "H1",
+                  "description": "Timeframe"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-04-01",
+                  "description": "Start date YYYY-MM-DD"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13",
+                  "description": "End date YYYY-MM-DD"
+                }
+              ]
+            },
+            "description": "Returns all H1 bars for XAUUSD between two dates."
+          },
+          "response": []
+        },
+        {
+          "name": "Ticks (latest N)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ticks?symbol=XAUUSD&count=100&flags=all",
+              "host": ["{{base_url}}"],
+              "path": ["ticks"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                },
+                {
+                  "key": "count",
+                  "value": "100",
+                  "description": "Number of ticks (max 10000)"
+                },
+                {
+                  "key": "flags",
+                  "value": "all",
+                  "description": "all | info | trade"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-04-13T10:00:00",
+                  "description": "Start timestamp — switches to from+count mode",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13T11:00:00",
+                  "description": "End timestamp — switches to range mode",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns the latest 100 ticks for XAUUSD. Enable `from` alone for from+count mode, or both `from`+`to` for a time range."
+          },
+          "response": []
+        },
+        {
+          "name": "Ticks (date range)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ticks?symbol=XAUUSD&flags=all&from=2026-04-13T10:00:00&to=2026-04-13T11:00:00",
+              "host": ["{{base_url}}"],
+              "path": ["ticks"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                },
+                {
+                  "key": "flags",
+                  "value": "all",
+                  "description": "all | info | trade"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-04-13T10:00:00",
+                  "description": "Start timestamp YYYY-MM-DDTHH:MM:SS"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-04-13T11:00:00",
+                  "description": "End timestamp YYYY-MM-DDTHH:MM:SS"
+                }
+              ]
+            },
+            "description": "Returns all ticks for XAUUSD between two timestamps."
+          },
+          "response": []
+        },
+        {
+          "name": "Market trades (latest)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/market/trades?symbol=XAUUSD&count=100",
+              "host": ["{{base_url}}"],
+              "path": ["market", "trades"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                },
+                {
+                  "key": "count",
+                  "value": "100",
+                  "description": "Number of trade ticks (default 100, max 10000)"
+                }
+              ]
+            },
+            "description": "Returns the most recent executed trade ticks (last price + volume) for a symbol using COPY_TICKS_TRADE. Distinct from quote ticks (bid/ask changes)."
+          },
+          "response": []
+        },
+        {
+          "name": "Order book (market depth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/market/orderbook?symbol=XAUUSD",
+              "host": ["{{base_url}}"],
+              "path": ["market", "orderbook"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "XAUUSD",
+                  "description": "Symbol name (required)"
+                }
+              ]
+            },
+            "description": "Returns the current Depth of Market (DOM) snapshot for a symbol. Bids sorted highest price first; asks sorted lowest price first. Requires the broker to enable DOM data for the symbol."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trading (Legacy)",
+      "item": [
+        {
+          "name": "Open XAUUSD long (legacy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"margin_usdt\": 5.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/trade/open-long-xauusd",
+              "host": ["{{base_url}}"],
+              "path": ["trade", "open-long-xauusd"]
+            },
+            "description": "Kept for backward compatibility. Prefer POST /trade/open."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

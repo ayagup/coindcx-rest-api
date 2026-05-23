@@ -10,7 +10,14 @@ import {
 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const FUTURES_CONTRACTS = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-GOAT_USDT', 'B-TIA_USDT', 'B-PENDLE_USDT', 'B-LUNA2_USDT', 'B-COMP_USDT', 'B-1000FLOKI_USDT', 'B-KAS_USDT', 'B-ZK_USDT', 'B-AVA_USDT', 'B-STX_USDT', 'B-MOODENG_USDT', 'B-VINE_USDT', 'B-APT_USDT', 'B-BNB_USDT', 'B-AR_USDT', 'B-LINK_USDT', 'B-MANA_USDT', 'B-MEW_USDT'];
+export const COINDCX_CONTRACTS = [
+  'B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-XNG_USDT',
+  'B-CL_USDT', 'B-NATGAS_USDT', 'B-SPX_USDT', 'B-GOAT_USDT', 'B-TIA_USDT',
+  'B-PENDLE_USDT', 'B-LUNA2_USDT', 'B-COMP_USDT', 'B-1000FLOKI_USDT', 'B-KAS_USDT',
+  'B-ZK_USDT', 'B-AVA_USDT', 'B-STX_USDT', 'B-MOODENG_USDT', 'B-VINE_USDT',
+  'B-APT_USDT', 'B-BNB_USDT', 'B-AR_USDT', 'B-LINK_USDT', 'B-MANA_USDT', 'B-MEW_USDT',
+];
+
 
 type OrderSide = 'buy' | 'sell';
 type OrderType = 'market' | 'limit';
@@ -50,6 +57,18 @@ interface Balance {
   locked_balance?: number;
   available?: number;
   [key: string]: any;
+}
+
+interface Mt5Balance {
+  balance?: number;
+  currency?: string;
+  equity?: number;
+  free_margin?: number;
+  leverage?: number;
+  margin?: number;
+  margin_level?: number;
+  profit?: number;
+  ok?: boolean;
 }
 
 interface FuturesPosition {
@@ -140,16 +159,25 @@ const tabBtnStyle = (active: boolean, color = '#3b82f6'): React.CSSProperties =>
 });
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const FuturesTradingPage: React.FC = () => {
+const CoinDCXTradingPage: React.FC = () => {
+  const contracts = COINDCX_CONTRACTS;
+  const pageTitle = 'CoinDCX Futures';
+  const defaultContract = 'B-BTC_USDT';
+  const showMt5 = false;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { config } = useTradeConfig();
+  const { coindcxConfig: config } = useTradeConfig();
 
   // State
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [mt5Balance, setMt5Balance] = useState<Mt5Balance | null>(null);
   const [positions, setPositions] = useState<FuturesPosition[]>([]);
   const [activeOrders, setActiveOrders] = useState<FuturesOrder[]>([]);
   const [latestPrice, setLatestPrice] = useState<number | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  // Ref tracks the contract that the most-recently-initiated price fetch targets.
+  // Any fetch that resolves for a different contract is discarded (stale race guard).
+  const priceContractRef = React.useRef<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,34 +189,40 @@ const FuturesTradingPage: React.FC = () => {
   const [pnlTotals, setPnlTotals] = useState<{ realizedUsdt: number; unrealizedUsdt: number } | null>(null);
   const [form, setForm] = useState<OrderForm>({
     ...DEFAULT_FORM,
-    contract: searchParams.get('symbol') ?? DEFAULT_FORM.contract,
+    contract: searchParams.get('symbol') ?? defaultContract ?? DEFAULT_FORM.contract,
   });
 
   // ── Data fetchers (use WebSocket data endpoints — no credentials required) ──
   const fetchBalances = useCallback(async () => {
     try {
-      // Primary: single-currency current endpoint — returns one WebSocketBalanceUpdateData object
+      // Current endpoint returns { futures: {...}, mt5: {...} }
       const res = await apiService.getWsCurrentBalance('USDT');
       const data = res.data;
       if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // New shape: { futures: Balance, mt5: Mt5Balance }
+        if (data.futures || data.mt5) {
+          if (data.futures) setBalances([data.futures]);
+          if (data.mt5) setMt5Balance(data.mt5);
+          return;
+        }
+        // Legacy shape: single balance object directly
         setBalances([data]);
         return;
       }
-      // Fallback: latest-all-currencies (array or object map)
-      const res2 = await apiService.getWsLatestAllBalances();
-      const data2 = res2.data;
-      if (Array.isArray(data2) && data2.length > 0) {
-        setBalances(data2);
-        return;
-      }
-      if (data2 && typeof data2 === 'object' && !Array.isArray(data2)) {
-        const arr = Object.entries(data2).map(([currency, val]: [string, any]) =>
-          typeof val === 'object' ? { currency, ...val } : { currency, balance: val }
-        );
-        setBalances(arr);
-      }
     } catch (e: any) {
       console.error('Balance fetch error:', e);
+    }
+  }, []);
+
+  const fetchLeverage = useCallback(async () => {
+    try {
+      const res = await apiService.getFuturesLeverage();
+      const data = res.data;
+      if (data?.mt5?.leverage != null) {
+        setMt5Balance(prev => prev ? { ...prev, leverage: data.mt5.leverage } : { leverage: data.mt5.leverage });
+      }
+    } catch (e) {
+      console.error('Leverage fetch error:', e);
     }
   }, []);
 
@@ -223,15 +257,56 @@ const FuturesTradingPage: React.FC = () => {
   }, [form.contract]);
 
   const fetchLatestPrice = useCallback(async (contract: string) => {
+    // Register this contract as the active request — any earlier in-flight call
+    // that resolves after this point will see a mismatch and discard its result.
+    priceContractRef.current = contract;
+    setPriceLoading(true);
+
+    const commit = (price: number | null) => {
+      // Only apply if this call is still the latest for this contract
+      if (priceContractRef.current !== contract) return;
+      setLatestPrice(price);
+      setPriceLoading(false);
+    };
+
     try {
-      // Use limit=20 and pick the latest record with non-null markPrice
-      const res = await apiService.getFuturesMarketDataPublic(contract, 20);
-      const arr: any[] = Array.isArray(res.data) ? res.data : [];
-      const record = [...arr].reverse().find(r => r.markPrice != null && Number(r.markPrice) > 0);
-      const price = record?.markPrice ?? record?.price ?? record?.mark_price;
-      if (price && Number(price) > 0) { setLatestPrice(Number(price)); return; }
-    } catch (_) {}
-    setLatestPrice(null);
+      // Per-contract endpoint — two response shapes:
+      // MT5 (e.g. XAUUSD):        { ask, bid, last, ... }
+      // CoinDCX (e.g. B-BTC_USDT): { markPrice, instrument, ... } — markPrice is often null
+      const res = await apiService.getFuturesInstrumentPriceLatest(contract);
+      if (priceContractRef.current !== contract) return; // stale — bail immediately
+      const data = res.data;
+
+      // MT5 shape: mid-point of ask/bid
+      if (data?.ask != null || data?.bid != null) {
+        const ask = Number(data.ask ?? 0);
+        const bid = Number(data.bid ?? 0);
+        if (ask > 0 && bid > 0) { commit((ask + bid) / 2); return; }
+        if (ask > 0) { commit(ask); return; }
+        if (bid > 0) { commit(bid); return; }
+        const last = Number(data.last ?? 0);
+        if (last > 0) { commit(last); return; }
+      }
+
+      // CoinDCX shape: markPrice (often null — fall through to bulk endpoint)
+      if (data?.markPrice != null && Number(data.markPrice) > 0) {
+        commit(Number(data.markPrice)); return;
+      }
+    } catch { /* instrument endpoint unavailable — fall through */ }
+
+    // Fallback: bulk current-prices endpoint (JSON string, 'ls' = last/mark price)
+    try {
+      const res = await apiService.getFuturesCurrentPricesPublic();
+      if (priceContractRef.current !== contract) return; // stale
+      const pricesRaw = res.data?.prices;
+      const prices: Record<string, { ls?: number; mp?: number }> =
+        typeof pricesRaw === 'string' ? JSON.parse(pricesRaw) : (pricesRaw ?? {});
+      const entry = prices[contract];
+      const price = entry?.ls ?? entry?.mp;
+      if (price != null && Number(price) > 0) { commit(Number(price)); return; }
+    } catch { /* silently ignore */ }
+
+    commit(null);
   }, []);
 
   const fetchTradeLog = useCallback(async () => {
@@ -359,15 +434,17 @@ const FuturesTradingPage: React.FC = () => {
     else setRefreshing(true);
     setError(null);
     try {
-      await Promise.all([fetchBalances(), fetchPositions(), fetchOrders(), fetchTradeLog()]);
-      await fetchLatestPrice(form.contract);
+      await Promise.all([
+        fetchBalances(), fetchLeverage(), fetchPositions(),
+        fetchOrders(), fetchTradeLog(),
+      ]);
     } catch (e: any) {
       setError(e.message ?? 'Failed to fetch data');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchBalances, fetchPositions, fetchOrders, fetchLatestPrice, form.contract]);
+  }, [fetchBalances, fetchLeverage, fetchPositions, fetchOrders, fetchTradeLog]);
 
   useEffect(() => { fetchAll(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -478,6 +555,7 @@ const FuturesTradingPage: React.FC = () => {
         order_type: form.orderType,
         quantity: qty,
         leverage: config.leverage,
+        margin_usdt: config.marginUsdt,
         ...(form.orderType === 'limit' ? { price: Number(form.price) } : {}),
       };
       const orderRes = await apiService.createFuturesOrderPublic(payload);
@@ -595,7 +673,7 @@ const FuturesTradingPage: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Zap size={22} style={{ color: '#f59e0b' }} />
-          <h1 style={{ fontSize: '1.4rem', margin: 0 }}>Futures Trading</h1>
+          <h1 style={{ fontSize: '1.4rem', margin: 0 }}>{pageTitle}</h1>
         </div>
         <button
           onClick={() => fetchAll()}
@@ -612,39 +690,91 @@ const FuturesTradingPage: React.FC = () => {
 
       {/* ── Wallet balance bar ── */}
       <div style={{ ...cardStyle, marginBottom: '1rem', padding: '0.75rem 1rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
+
+          {/* ── Futures wallet ── */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <DollarSign size={16} style={{ color: '#f59e0b' }} />
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Futures Wallet (USDT)</span>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Futures</span>
           </div>
-
           {usdtBalance ? (
             <>
               <div>
                 <div style={labelStyle}>Available</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#10b981' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#10b981' }}>
                   {fmt(availableUsdt, 4)} USDT
                 </div>
               </div>
               <div>
-                <div style={labelStyle}>Total Balance</div>
-                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#f1f5f9' }}>
+                <div style={labelStyle}>Total</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f1f5f9' }}>
                   {fmt(usdtBalance.balance ?? usdtBalance.available, 4)} USDT
                 </div>
               </div>
-              {usdtBalance.locked_balance != null && (
+              {(usdtBalance.lockedBalance ?? usdtBalance.locked_balance) != null && (
                 <div>
                   <div style={labelStyle}>In Order</div>
-                  <div style={{ fontSize: '0.95rem', color: '#f59e0b' }}>
-                    {fmt(usdtBalance.locked_balance, 4)} USDT
+                  <div style={{ fontSize: '0.9rem', color: '#f59e0b' }}>
+                    {fmt(usdtBalance.lockedBalance ?? usdtBalance.locked_balance, 4)} USDT
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <span style={{ fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic' }}>
-              No USDT balance found. Ensure your API key has read permission.
-            </span>
+            <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>No futures balance</span>
+          )}
+
+          {/* ── Divider ── */}
+          {showMt5 && mt5Balance && (
+            <div style={{ width: 1, height: 36, background: '#334155', flexShrink: 0 }} />
+          )}
+
+          {/* ── MT5 wallet ── */}
+          {showMt5 && mt5Balance && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Activity size={15} style={{ color: '#818cf8' }} />
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>MT5 ({mt5Balance.currency ?? 'USD'})</span>
+              </div>
+              <div>
+                <div style={labelStyle}>Balance</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f1f5f9' }}>
+                  {fmt(mt5Balance.balance, 2)}
+                </div>
+              </div>
+              <div>
+                <div style={labelStyle}>Equity</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f1f5f9' }}>
+                  {fmt(mt5Balance.equity, 2)}
+                </div>
+              </div>
+              <div>
+                <div style={labelStyle}>Free Margin</div>
+                <div style={{ fontSize: '0.9rem', color: '#10b981' }}>
+                  {fmt(mt5Balance.free_margin, 2)}
+                </div>
+              </div>
+              <div>
+                <div style={labelStyle}>Margin Used</div>
+                <div style={{ fontSize: '0.9rem', color: '#f59e0b' }}>
+                  {fmt(mt5Balance.margin, 2)}
+                </div>
+              </div>
+              <div>
+                <div style={labelStyle}>Float P&L</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: (mt5Balance.profit ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                  {(mt5Balance.profit ?? 0) >= 0 ? '+' : ''}{fmt(mt5Balance.profit, 2)}
+                </div>
+              </div>
+              {mt5Balance.leverage != null && (
+                <div>
+                  <div style={labelStyle}>Leverage</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#818cf8' }}>
+                    1:{mt5Balance.leverage}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {latestPrice && (
@@ -685,11 +815,26 @@ const FuturesTradingPage: React.FC = () => {
             <div style={labelStyle}>Contract</div>
             <select
               value={form.contract}
-              onChange={e => setForm(f => ({ ...f, contract: e.target.value }))}
+              onChange={e => {
+                setLatestPrice(null);
+                setForm(f => ({ ...f, contract: e.target.value }));
+              }}
               style={selectStyle}
             >
-              {FUTURES_CONTRACTS.map(c => <option key={c} value={c}>{c}</option>)}
+              {contracts.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            {/* Mark price badge */}
+            <div style={{ marginTop: '0.35rem', minHeight: '1.2rem' }}>
+              {priceLoading ? (
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Fetching price…</span>
+              ) : latestPrice != null ? (
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
+                  Mark: ${latestPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>No mark price available</span>
+              )}
+            </div>
           </div>
 
           {/* Long / Short */}
@@ -1237,4 +1382,4 @@ const FuturesTradingPage: React.FC = () => {
   );
 };
 
-export default FuturesTradingPage;
+export default CoinDCXTradingPage;

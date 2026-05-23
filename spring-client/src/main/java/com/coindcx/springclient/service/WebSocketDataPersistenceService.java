@@ -1920,61 +1920,6 @@ public class WebSocketDataPersistenceService {
     }
 
     /**
-     * Save a Yahoo Finance DXY kline (candlestick) into websocket_futures_candlestick_data.
-     * Called for every completed candle polled from the Yahoo Finance chart REST API.
-     *
-     * @param kline      the kline object built by {@link YahooFinanceDxyService}
-     * @param streamName the stream identifier, e.g. "dxyusd@kline_1m"
-     */
-    @Async
-    @Transactional
-    public void saveYahooFinanceCandlestickData(JsonObject kline, String streamName) {
-        try {
-            WebSocketFuturesCandlestickData entity = new WebSocketFuturesCandlestickData();
-            entity.setChannelName(streamName);
-            entity.setProduct("futures");
-            entity.setRawData(kline.toString());
-
-            // Interval / duration — Yahoo Finance sends "1m", "5m", "1h", "1d" → normalise to "1", "5", "60", "1D"
-            String rawInterval = kline.has("i") ? kline.get("i").getAsString() : null;
-            String normalizedDuration = normalizeDuration(rawInterval);
-            entity.setInterval(normalizedDuration != null ? normalizedDuration : rawInterval);
-            entity.setDuration(normalizedDuration != null ? normalizedDuration : rawInterval);
-
-            // Symbol — e.g. "DXYUSD"; use as both pair and symbol
-            String symbol = kline.has("s") ? kline.get("s").getAsString() : "DXYUSD";
-            entity.setPair(symbol);
-            entity.setSymbol(symbol);
-
-            // Timestamps — already provided in milliseconds
-            if (kline.has("t") && !kline.get("t").isJsonNull()) {
-                entity.setOpenTime(kline.get("t").getAsLong());
-            }
-            if (kline.has("T") && !kline.get("T").isJsonNull()) {
-                entity.setCloseTime(kline.get("T").getAsDouble());
-            }
-
-            // Event timestamp proxy
-            entity.setEts(entity.getOpenTime() != null ? entity.getOpenTime() : System.currentTimeMillis());
-
-            // OHLCV
-            entity.setOpen(kline.has("o")  ? new BigDecimal(kline.get("o").getAsString()) : BigDecimal.ZERO);
-            entity.setClose(kline.has("c") ? new BigDecimal(kline.get("c").getAsString()) : BigDecimal.ZERO);
-            entity.setHigh(kline.has("h")  ? new BigDecimal(kline.get("h").getAsString()) : BigDecimal.ZERO);
-            entity.setLow(kline.has("l")   ? new BigDecimal(kline.get("l").getAsString()) : BigDecimal.ZERO);
-            entity.setVolume(kline.has("v")      ? new BigDecimal(kline.get("v").getAsString()) : BigDecimal.ZERO);
-            entity.setQuoteVolume(kline.has("q") ? new BigDecimal(kline.get("q").getAsString()) : BigDecimal.ZERO);
-
-            futuresCandlestickDataRepository.save(entity);
-            logger.debug("Saved Yahoo Finance candlestick: stream={} duration={} openTime={} closed={}",
-                    streamName, normalizedDuration, entity.getOpenTime(),
-                    kline.has("x") && kline.get("x").getAsBoolean());
-        } catch (Exception e) {
-            logger.error("Error saving Yahoo Finance candlestick data from stream {}: {}", streamName, e.getMessage());
-        }
-    }
-
-    /**
      * Save futures orderbook data
      * Handles depth-snapshot event
      */

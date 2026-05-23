@@ -4,10 +4,9 @@ import { apiService } from '../services/api';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
 import { TrendingUp, TrendingDown, RefreshCw, Zap, ClipboardList } from 'lucide-react';
+import { MT5_CONTRACTS } from './MT5TradingPage';
 
-type MarketType = 'spot' | 'futures';
-
-const FUTURES_SYMBOLS = ['B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT'];
+type MarketType = 'spot' | 'futures' | 'mt5';
 
 interface MarketData {
   market: string;
@@ -20,19 +19,9 @@ interface MarketData {
   close?: string;
 }
 
-// Restricted futures symbols to monitor
-const ALLOWED_FUTURES = [
-  'B-BTC_USDT', 'B-ETH_USDT', 'B-XAU_USDT', 'B-XAG_USDT', 'B-GOAT_USDT',
-  'B-TIA_USDT', 'B-PENDLE_USDT', 'B-LUNA2_USDT', 'B-COMP_USDT', 'B-1000FLOKI_USDT',
-  'B-KAS_USDT', 'B-ZK_USDT', 'B-AVA_USDT', 'B-STX_USDT', 'B-MOODENG_USDT',
-  'B-VINE_USDT', 'B-APT_USDT', 'B-BNB_USDT', 'B-AR_USDT', 'B-LINK_USDT',
-  'B-MANA_USDT', 'B-MEW_USDT'
-];
-
 const MarketPage: React.FC = () => {
   const navigate = useNavigate();
-  const [spotMarkets, setSpotMarkets] = useState<string[]>([]);
-  const [futuresMarkets] = useState<string[]>(FUTURES_SYMBOLS);
+  const [futuresMarkets, setFuturesMarkets] = useState<string[]>([]);
   const [spotData, setSpotData] = useState<Map<string, MarketData>>(new Map());
   const [futuresData, setFuturesData] = useState<Map<string, MarketData>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -40,93 +29,69 @@ const MarketPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<MarketType>('spot');
 
-  // Fetch list of spot markets
+  // Fetch futures instruments list
   const fetchMarkets = async () => {
     try {
-      const [spotResponse] = await Promise.all([
-        apiService.getAllSpotMarkets(),
-        apiService.getAllFuturesContracts()
-      ]);
-      
-      setSpotMarkets(spotResponse.data || []);
-      // Always set futures to our restricted list
-      setFuturesMarkets(ALLOWED_FUTURES);
-      
-      // If no spot markets are available, stop loading
-      if (!spotResponse.data || spotResponse.data.length === 0) {
-        setLoading(false);
-      }
+      const instrResponse = await apiService.getActiveFuturesInstruments();
+      const allFutures: string[] = instrResponse.data?.futures ?? instrResponse.data ?? [];
+      const merged = Array.from(new Set([...allFutures, ...MT5_CONTRACTS])).sort();
+      setFuturesMarkets(merged);
     } catch (err: any) {
-      console.error('Error fetching spot markets:', err);
-      setError(err.response?.data?.message || 'Failed to fetch markets list');
-      // Still set futures markets even on error
-      setFuturesMarkets(ALLOWED_FUTURES);
-      setLoading(false);
+      console.error('Error fetching futures markets:', err);
     }
   };
 
-  // Fetch latest price data for each market
+  // Fetch all prices in two bulk calls instead of per-symbol calls
   const fetchMarketData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch spot market data
-      const spotDataMap = new Map<string, MarketData>();
-      const spotPromises = spotMarkets.slice(0, 50).map(async (market) => {
-        try {
-          const response = await apiService.getLatestSpotPrice(market);
-          if (response.data) {
-            spotDataMap.set(market, {
-              market: market,
-              price: response.data.price || response.data.lastPrice || '0',
-              volume: response.data.volume,
-              high: response.data.high,
-              low: response.data.low,
-              open: response.data.open,
-              close: response.data.close,
-              timestamp: response.data.timestamp
-            });
+      const [spotRes, futuresRes] = await Promise.allSettled([
+        apiService.getMarketsDetails(),
+        apiService.getFuturesCurrentPricesPublic(),
+      ]);
+
+      // ── Spot: parse markets_details array ────────────────────────────────
+      if (spotRes.status === 'fulfilled') {
+        const arr: any[] = Array.isArray(spotRes.value.data) ? spotRes.value.data : [];
+        const spotMap = new Map<string, MarketData>();
+        for (const item of arr) {
+          if (!item?.market) continue;
+          const lastPrice = item.lastPrice ?? item.price ?? '0';
+          spotMap.set(item.market, {
+            market: item.market,
+            price: String(lastPrice),
+            volume: item.volume != null ? String(item.volume) : undefined,
+            high: item.high != null ? String(item.high) : undefined,
+            low: item.low != null ? String(item.low) : undefined,
+            open: item.open != null ? String(item.open) : undefined,
+            close: item.close != null ? String(item.close) : lastPrice != null ? String(lastPrice) : undefined,
+            timestamp: item.timestamp != null ? String(item.timestamp) : undefined,
+          });
+        }
+        setSpotData(spotMap);
+      }
+
+      // ── Futures/MT5: parse bulk prices JSON string ────────────────────────
+      if (futuresRes.status === 'fulfilled') {
+        const pricesRaw = futuresRes.value.data?.prices;
+        const prices: Record<string, { mp?: number; ls?: number } | null> =
+          typeof pricesRaw === 'string' ? JSON.parse(pricesRaw) : (pricesRaw ?? {});
+        const freshFuturesMap = new Map<string, MarketData>();
+        for (const [contract, entry] of Object.entries(prices)) {
+          if (!entry) continue;
+          const price = entry.mp ?? entry.ls;
+          if (price != null && Number(price) > 0) {
+            freshFuturesMap.set(contract, { market: contract, price: String(price) });
           }
-        } catch (err) {
-          // Skip markets with no data
-          console.debug(`No data for spot market: ${market}`);
         }
-      });
-
-      // Fetch futures market data — retain last known price; never drop a symbol
-      const freshFuturesMap = new Map<string, MarketData>();
-      const futuresPromises = futuresMarkets.map(async (contract) => {
-        try {
-          const response = await apiService.getLatestFuturesPrice(contract);
-          if (response.data) {
-            freshFuturesMap.set(contract, {
-              market: contract,
-              price: response.data.lastPrice || response.data.markPrice || '0',
-              volume: response.data.volume,
-              high: response.data.high,
-              low: response.data.low,
-              open: response.data.open,
-              close: response.data.close,
-              timestamp: response.data.timestamp
-            });
-          }
-        } catch (err) {
-          console.debug(`No data for futures contract: ${contract}`);
-        }
-      });
-
-      await Promise.all([...spotPromises, ...futuresPromises]);
-
-      setSpotData(spotDataMap);
-      // Only overwrite entries where fresh data arrived; keep everything else
-      setFuturesData(prev => {
-        const merged = new Map(prev);
-        for (const [k, v] of freshFuturesMap) {
-          merged.set(k, v);
-        }
-        return merged;
-      });
+        setFuturesData(prev => {
+          const merged = new Map(prev);
+          for (const [k, v] of freshFuturesMap) merged.set(k, v);
+          return merged;
+        });
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch market data');
     } finally {
@@ -139,37 +104,29 @@ const MarketPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Futures symbols are hardcoded; always fetch futures + spot when spot markets are ready
     fetchMarketData();
     const interval = setInterval(fetchMarketData, 10000);
     return () => clearInterval(interval);
-  }, [spotMarkets]);
+  }, [futuresMarkets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get filtered data based on active tab
+  const bFuturesMarkets = futuresMarkets.filter(m => m.startsWith('B-'));
+  const mt5Markets = futuresMarkets.filter(m => !m.startsWith('B-'));
+
   const getFilteredData = () => {
+    const term = searchTerm.toLowerCase();
     if (activeTab === 'futures') {
-      return futuresMarkets
-        .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
+      return bFuturesMarkets
+        .filter(market => market.toLowerCase().includes(term))
         .map(market => futuresData.get(market) ?? { market, price: '' });
     }
-    return spotMarkets
-      .filter(market => market.toLowerCase().includes(searchTerm.toLowerCase()))
-      .map(market => {
-        const data = dataMap.get(market);
-        // For futures, always return a market entry even if no data yet
-        if (!data && activeTab === 'futures') {
-          return {
-            market: market,
-            price: '0',
-            volume: undefined,
-            high: undefined,
-            low: undefined,
-            timestamp: undefined
-          };
-        }
-        return data;
-      })
-      .filter(data => data !== undefined) as MarketData[];
+    if (activeTab === 'mt5') {
+      return mt5Markets
+        .filter(market => market.toLowerCase().includes(term))
+        .map(market => futuresData.get(market) ?? { market, price: '' });
+    }
+    return Array.from(spotData.values())
+      .filter(data => data.market.toLowerCase().includes(term));
   };
 
   const filteredData = getFilteredData();
@@ -185,7 +142,8 @@ const MarketPage: React.FC = () => {
 
   const handleTradeClick = (e: React.MouseEvent, market: string) => {
     e.stopPropagation();
-    navigate(`/futures?symbol=${encodeURIComponent(market)}`);
+    const route = activeTab === 'mt5' ? '/mt5' : '/futures';
+    navigate(`${route}?symbol=${encodeURIComponent(market)}`);
   };
 
   if (loading && spotData.size === 0 && futuresData.size === 0) return <Loading />;
@@ -221,8 +179,15 @@ const MarketPage: React.FC = () => {
           className={`tab ${activeTab === 'futures' ? 'active' : ''}`}
           onClick={() => setActiveTab('futures')}
         >
-          Futures Markets
-          <span className="tab-count">{futuresData.size}</span>
+          CoinDCX Futures
+          <span className="tab-count">{bFuturesMarkets.length}</span>
+        </button>
+        <button
+          className={`tab ${activeTab === 'mt5' ? 'active' : ''}`}
+          onClick={() => setActiveTab('mt5')}
+        >
+          MT5 Markets
+          <span className="tab-count">{mt5Markets.length}</span>
         </button>
       </div>
 
@@ -355,15 +320,18 @@ const MarketPage: React.FC = () => {
                 📊 WebSocket Data
               </div>
 
-              {activeTab === 'futures' && (
+              {(activeTab === 'futures' || activeTab === 'mt5') && (
                 <button
                   onClick={(e) => handleTradeClick(e, data.market)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
                     marginTop: '0.6rem', width: '100%',
                     padding: '0.45rem', border: 'none', borderRadius: '0.375rem',
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    color: '#0f172a', fontWeight: 700, fontSize: '0.8rem',
+                    background: activeTab === 'mt5'
+                      ? 'linear-gradient(135deg, #818cf8, #6366f1)'
+                      : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: activeTab === 'mt5' ? '#fff' : '#0f172a',
+                    fontWeight: 700, fontSize: '0.8rem',
                     cursor: 'pointer', letterSpacing: '0.03em',
                     transition: 'opacity 0.15s',
                   }}
@@ -371,7 +339,7 @@ const MarketPage: React.FC = () => {
                   onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                 >
                   <Zap size={13} />
-                  Trade Futures
+                  {activeTab === 'mt5' ? 'Trade MT5' : 'Trade Futures'}
                 </button>
               )}
             </div>
