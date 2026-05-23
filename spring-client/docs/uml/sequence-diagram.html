@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Client Sequence Diagrams</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4efe6;
+            --panel: rgba(255, 252, 245, 0.96);
+            --ink: #1f2937;
+            --muted: #5b6472;
+            --border: #d8ccb8;
+            --accent: #9a4f3d;
+            --accent-soft: #eadfcb;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(154, 79, 61, 0.16), transparent 26%),
+                linear-gradient(180deg, #efe6d7 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1480px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(75, 55, 28, 0.12);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(1.9rem, 3vw, 3.2rem);
+            line-height: 1.05;
+            letter-spacing: 0.015em;
+        }
+
+        .intro {
+            margin: 0 0 24px;
+            max-width: 80ch;
+            font-size: 1rem;
+            line-height: 1.65;
+            color: #344054;
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(250, 245, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.25rem, 2vw, 1.85rem);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 78ch;
+            line-height: 1.6;
+            color: #3f4956;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid #8f6e4b;
+            background: linear-gradient(180deg, #fffaf2 0%, #eadfc9 100%);
+            color: var(--ink);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.1);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.14);
+        }
+
+        .toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: #fffdf8;
+        }
+
+        .mermaid {
+            min-width: 900px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#f3e6d0",
+                primaryTextColor: "#1f2937",
+                primaryBorderColor: "#8f6e4b",
+                lineColor: "#7b5a3c",
+                secondaryColor: "#fff8ef",
+                tertiaryColor: "#f7efe1",
+                actorBorder: "#8f6e4b",
+                actorBkg: "#efe3cf",
+                actorTextColor: "#1f2937",
+                signalColor: "#7b5a3c",
+                signalTextColor: "#1f2937",
+                labelBoxBkgColor: "#fbf5ea",
+                labelBoxBorderColor: "#b89470",
+                loopTextColor: "#1f2937",
+                noteBkgColor: "#fff5e3",
+                noteBorderColor: "#c49c72",
+                fontFamily: "Georgia, Times New Roman, serif"
+            },
+            sequence: {
+                useMaxWidth: false,
+                wrap: true,
+                messageFontSize: 16,
+                noteFontSize: 15,
+                actorFontSize: 16,
+                boxMargin: 12,
+                diagramMarginX: 28,
+                diagramMarginY: 18
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!mermaidNode) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <h1>Spring Client Sequence Diagrams</h1>
+        <p class="intro">
+            These diagrams capture the main runtime interactions visible in the current Spring Boot codebase:
+            Socket.IO market-data ingestion, REST retrieval of persisted futures data, and futures order routing
+            between CoinDCX and the local MetaTrader 5 gateway.
+        </p>
+
+        <section class="diagram-card">
+            <h2>1. Startup And WebSocket Data Ingestion</h2>
+            <p>
+                Based on CoinDCXWebSocketService, WebSocketDataPersistenceService, and FuturesInstrumentPriceParsingService.
+                It shows startup connection, channel subscription, event routing, and the two most important persistence branches.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for startup and ingestion sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    participant App as SpringClientApplication
+    participant WS as CoinDCXWebSocketService
+    participant Config as WebSocketConfig
+    participant Stream as CoinDCX WebSocket Stream
+    participant Persist as WebSocketDataPersistenceService
+    participant CandleRepo as WebSocketFuturesCandlestickDataRepository
+    participant SnapshotRepo as WebSocketFuturesCurrentPricesDataRepository
+    participant Parser as FuturesInstrumentPriceParsingService
+    participant PriceRepo as WebSocketFuturesInstrumentPriceRepository
+
+    App->>WS: initialize() via @PostConstruct
+    WS->>Config: getWebsocketEndpoint(), getApiKey(), getApiSecret()
+    WS->>Stream: connectToWebSocket()
+    Stream-->>WS: EVENT_CONNECT
+    WS->>Stream: join private channels for candlestick, depth, current prices, balance, order, trade, position updates
+    Note over WS,Persist: registerEventHandler() selects the matching save* method using event name and channel suffix.
+
+    loop For each inbound Socket.IO event
+        Stream-->>WS: { event, data }
+        WS->>WS: extractInnerDataString()<br/>extractChannelFromData()<br/>resolve handler
+
+        alt Event is futures candlestick
+            WS->>Persist: saveFuturesCandlestickData(data, channel) [@Async]
+            Persist->>Persist: parse nested map.data payload<br/>normalize duration and open_time
+            loop For each candle in data[]
+                Persist->>CandleRepo: save(WebSocketFuturesCandlestickData)
+            end
+            CandleRepo-->>Persist: persisted
+
+        else Event is currentPrices@futures@rt
+            WS->>Persist: saveFuturesCurrentPricesData(data) [@Async]
+            Persist->>SnapshotRepo: save(WebSocketFuturesCurrentPricesData)
+            SnapshotRepo-->>Persist: saved snapshot
+            Persist->>Parser: parseAndSaveInstrumentPrices(savedSnapshot) [@Async]
+            Parser->>PriceRepo: saveAll(individual instrument prices)
+            PriceRepo-->>Parser: prices persisted
+
+        else Event is balance, order, trade, position, or orderbook update
+            WS->>Persist: save*UpdateData(...) [@Async]
+            Persist->>Persist: map payload into typed entity
+            Persist-->>WS: async write queued
+        end
+    end
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. REST Query Of Persisted Futures Data</h2>
+            <p>
+                Based on WebSocketDataController. The controller serves candlesticks when a timeframe is supplied,
+                otherwise it falls back from generic futures rows to parsed instrument-price snapshots.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for futures data query sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor Client as React Frontend / API Consumer
+    participant Controller as WebSocketDataController
+    participant CandleRepo as WebSocketFuturesCandlestickDataRepository
+    participant FuturesRepo as WebSocketFuturesDataRepository
+    participant PriceService as FuturesInstrumentPriceParsingService
+    participant PriceRepo as WebSocketFuturesInstrumentPriceRepository
+
+    Client->>Controller: GET /api/websocket/data/futures/{contractSymbol}?timeframe=1h&amp;limit=100
+
+    alt timeframe query parameter is present
+        Controller->>Controller: TIMEFRAME_TO_DURATION.get("1h") -> "60"
+        Controller->>CandleRepo: findByPairAndDurationWithLimit(pair, "60", limit)
+        CandleRepo-->>Controller: candlestick rows ordered by open_time DESC
+        Controller-->>Client: 200 OK with OHLCV candlesticks
+
+    else timeframe absent
+        Controller->>FuturesRepo: findByContractSymbolOrderByTimestampDesc(pair)
+
+        alt generic futures rows are found
+            FuturesRepo-->>Controller: WebSocketFuturesData list
+            Controller-->>Client: 200 OK with limited futures events
+
+        else fallback to parsed instrument prices
+            FuturesRepo-->>Controller: empty result
+            Controller->>PriceService: getRecentPrices(pair, limit)
+            PriceService->>PriceRepo: findRecentByInstrument(pair, limit)
+            PriceRepo-->>PriceService: parsed instrument prices
+            PriceService-->>Controller: fallback price list
+            Controller-->>Client: 200 OK with price fallback
+        end
+    end
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>3. Futures Order Creation And Routing</h2>
+            <p>
+                Based on FuturesController, FuturesService, MetaTraderService, MetaTraderSymbolService, and MetaTraderClient.
+                This shows the explicit MT5 branch and the default CoinDCX futures branch, including trade-log persistence.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for futures order routing sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor Client as React Frontend / API Consumer
+    participant Controller as FuturesController
+    participant SymbolService as MetaTraderSymbolService
+    participant MTService as MetaTraderService
+    participant MTClient as MetaTraderClient
+    participant MT5 as MetaTrader 5 Gateway
+    participant FuturesService as FuturesService
+    participant FuturesApi as FuturesApi / ApiClient
+    participant CoinDCX as CoinDCX REST API
+    participant TradeLog as FuturesTradeLogService
+    participant TradeLogRepo as FuturesTradeLogRepository
+
+    Client->>Controller: POST /api/futures/orders/create { pair, side, order_type, quantity, ... }
+    Controller->>Controller: resolve pair + margin mode + direction + quantity
+    Note over Controller,FuturesService: ApiCallLoggingAspect separately logs public service calls into ApiCallLog storage.
+
+    alt Explicit MT5 mode or pair belongs to MT5 registry
+        Controller->>SymbolService: isSymbolEnabled(pair)
+        SymbolService-->>Controller: true / false
+
+        alt pair missing or disabled
+            Controller-->>Client: 400 error JSON
+
+        else MT5 route
+            Controller->>MTService: openPosition(OpenPositionRequest)
+            MTService->>SymbolService: isSymbolEnabled(symbol)
+            SymbolService-->>MTService: true
+            MTService->>MTClient: openPosition(request)
+            MTClient->>MT5: POST /trade/open
+            MT5-->>MTClient: OpenPositionResponse
+            MTClient-->>MTService: response
+            MTService-->>Controller: OpenPositionResponse
+            Controller-->>Client: 200 OK with MT5 response JSON
+        end
+
+    else Default CoinDCX futures route
+        Controller->>Controller: build ExchangeV1DerivativesFuturesOrdersCreatePostRequest<br/>inject timestamp
+        Controller->>FuturesService: createOrder(request)
+        FuturesService->>FuturesService: build wrapped body { timestamp, order }
+        FuturesService->>FuturesApi: ApiClient.buildCall(...)
+        FuturesApi->>CoinDCX: POST /exchange/v1/derivatives/futures/orders/create
+        CoinDCX-->>FuturesApi: raw JSON response
+        FuturesApi-->>FuturesService: okhttp Response
+        opt futuresTradeLogService available
+            FuturesService->>TradeLog: logApiOrderSubmission(request, responseBody)
+            TradeLog->>TradeLogRepo: save(FuturesTradeLog entries)
+            TradeLogRepo-->>TradeLog: persisted
+        end
+        FuturesService-->>Controller: raw responseBody
+        Controller-->>Client: 200 OK with CoinDCX JSON
+    end
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Source classes: CoinDCXWebSocketService, WebSocketDataPersistenceService, FuturesInstrumentPriceParsingService,
+            WebSocketDataController, FuturesController, FuturesService, MetaTraderService, MetaTraderSymbolService, and MetaTraderClient.
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Frontend Deployment Diagram</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f4ef;
+            --panel: rgba(255, 252, 247, 0.97);
+            --ink: #1f2a37;
+            --muted: #5b6472;
+            --border: #d8d0c3;
+            --brand-deep: #2f4767;
+            --brand-red: #af3654;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(175, 54, 84, 0.14), transparent 24%),
+                radial-gradient(circle at top right, rgba(47, 71, 103, 0.12), transparent 22%),
+                linear-gradient(180deg, #f2ece3 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1560px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(54, 49, 39, 0.12);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3.2vw, 3.3rem);
+            line-height: 1.02;
+            letter-spacing: -0.02em;
+            color: var(--brand-deep);
+        }
+
+        .intro {
+            margin: 0;
+            max-width: 92ch;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #394352;
+        }
+
+        .badge {
+            align-self: start;
+            padding: 12px 16px;
+            border: 1px solid rgba(175, 54, 84, 0.22);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(175, 54, 84, 0.08), rgba(47, 71, 103, 0.05));
+            font-size: 0.92rem;
+            color: var(--brand-deep);
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255, 250, 244, 0.98) 0%, rgba(249, 244, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.24rem, 2vw, 1.9rem);
+            color: var(--brand-deep);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 86ch;
+            line-height: 1.62;
+            color: #45505f;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid rgba(47, 71, 103, 0.32);
+            background: linear-gradient(180deg, #fff8f3 0%, #eadfd1 100%);
+            color: var(--brand-deep);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.08);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.13);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .hint {
+            margin: 0 0 10px;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: #fffdf8;
+            cursor: grab;
+            touch-action: none;
+            scroll-behavior: auto;
+        }
+
+        .diagram-shell.is-panning {
+            cursor: grabbing;
+            user-select: none;
+        }
+
+        .mermaid {
+            min-width: 1040px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#efe5d8",
+                primaryTextColor: "#1f2a37",
+                primaryBorderColor: "#6b7c92",
+                lineColor: "#64748b",
+                secondaryColor: "#faf4eb",
+                tertiaryColor: "#f5ede1",
+                clusterBkg: "#faf3ea",
+                clusterBorder: "#a8a39b",
+                fontFamily: "Aptos, Segoe UI, sans-serif"
+            },
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: "basis"
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function zoomAtPoint(card, nextZoom, clientX, clientY) {
+            const shell = card.querySelector(".diagram-shell");
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!shell || !mermaidNode) {
+                return;
+            }
+
+            const currentZoom = Number(mermaidNode.dataset.zoom || 1);
+            const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+            if (clampedZoom === currentZoom) {
+                return;
+            }
+
+            const shellRect = shell.getBoundingClientRect();
+            const offsetX = clientX - shellRect.left + shell.scrollLeft;
+            const offsetY = clientY - shellRect.top + shell.scrollTop;
+            const focusRatioX = offsetX / currentZoom;
+            const focusRatioY = offsetY / currentZoom;
+
+            applyZoom(card, clampedZoom);
+
+            shell.scrollLeft = Math.max(0, focusRatioX * clampedZoom - (clientX - shellRect.left));
+            shell.scrollTop = Math.max(0, focusRatioY * clampedZoom - (clientY - shellRect.top));
+        }
+
+        function attachPanHandlers(shell) {
+            let pointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+
+            const stopPan = () => {
+                pointerId = null;
+                shell.classList.remove("is-panning");
+            };
+
+            shell.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                if (!shell.querySelector("svg")) {
+                    return;
+                }
+
+                pointerId = event.pointerId;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = shell.scrollLeft;
+                startScrollTop = shell.scrollTop;
+                shell.classList.add("is-panning");
+                shell.setPointerCapture(event.pointerId);
+                event.preventDefault();
+            });
+
+            shell.addEventListener("pointermove", (event) => {
+                if (pointerId !== event.pointerId) {
+                    return;
+                }
+                shell.scrollLeft = startScrollLeft - (event.clientX - startX);
+                shell.scrollTop = startScrollTop - (event.clientY - startY);
+            });
+
+            shell.addEventListener("pointerup", (event) => {
+                if (pointerId === event.pointerId) {
+                    shell.releasePointerCapture(event.pointerId);
+                    stopPan();
+                }
+            });
+
+            shell.addEventListener("pointercancel", stopPan);
+            shell.addEventListener("lostpointercapture", stopPan);
+        }
+
+        function attachWheelZoom(card, shell, mermaidNode) {
+            shell.addEventListener("wheel", (event) => {
+                if (!event.ctrlKey && !event.metaKey) {
+                    return;
+                }
+                event.preventDefault();
+                const direction = event.deltaY < 0 ? STEP : -STEP;
+                zoomAtPoint(card, Number(mermaidNode.dataset.zoom || 1) + direction, event.clientX, event.clientY);
+            }, { passive: false });
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const shell = card.querySelector(".diagram-shell");
+            if (!mermaidNode || !shell) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                attachPanHandlers(shell);
+                attachWheelZoom(card, shell, mermaidNode);
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div>
+                <h1>React Frontend Deployment Diagram</h1>
+                <p class="intro">
+                    These deployment views show how the React/Vite frontend is hosted in development and how the running browser application depends on environment configuration,
+                    local browser storage, and the Spring Boot backend. The diagrams are based on the current Vite server settings, `.env` values, and Axios service configuration in this codebase.
+                </p>
+            </div>
+            <div class="badge">Vite dev server on 3000,<br/>Spring API on 8080</div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>1. Development Deployment Topology</h2>
+            <p>
+                Local development layout from the developer workstation to the browser, Vite dev server, React source modules, and the backend API target configured through both Vite proxying and `VITE_API_BASE_URL`.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for development deployment diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart LR
+    subgraph workstation["Developer Workstation"]
+        src["react-frontend source\nTypeScript + TSX + CSS"]
+        packageJson["package.json\nnpm run dev / build / preview"]
+        envFile[".env\nVITE_API_BASE_URL=http://localhost:8080"]
+        viteCfg["vite.config.ts\nserver.port=3000\nproxy /api -> 8080"]
+        nodeRuntime["Node.js + npm"]
+    end
+
+    subgraph devHost["Frontend Host"]
+        viteDev["Vite Dev Server\nhttp://localhost:3000"]
+        hmr["Vite HMR runtime\nmodule reload + dev transforms"]
+    end
+
+    subgraph browser["User Browser"]
+        browserApp["React SPA runtime\nReact Router + providers + pages"]
+        storage["localStorage\napiKey, apiSecret, tradeConfig, tradeConfig_mt5"]
+    end
+
+    subgraph backendTier["Local API Tier"]
+        springApi["Spring Boot backend\nhttp://localhost:8080"]
+    end
+
+    nodeRuntime --> viteDev
+    src --> viteDev
+    packageJson --> viteDev
+    viteCfg --> viteDev
+    envFile --> viteDev
+    viteDev --> hmr
+    viteDev -->|serves index.html and modules| browserApp
+    hmr -->|live updates during dev| browserApp
+    browserApp --> storage
+    browserApp -->|absolute Axios baseURL from .env| springApi
+    viteDev -. optional relative /api proxy .-> springApi
+
+    classDef node fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef runtime fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    classDef external fill:#f3e0e4,stroke:#af3654,color:#1f2a37;
+    class src,packageJson,envFile,viteCfg,nodeRuntime node;
+    class viteDev,hmr,browserApp,storage runtime;
+    class springApi external;
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. Browser Runtime And Service Connectivity</h2>
+            <p>
+                The deployed client is a browser-hosted single-page app. It restores credentials and trade configuration from localStorage, routes between pages, and uses two Axios clients to call backend endpoints.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for browser runtime deployment diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart TB
+    user["User"] --> browser["Web Browser"]
+
+    subgraph clientRuntime["Browser Application Container"]
+        entry["main.tsx\nReactDOM.createRoot"]
+        appShell["App.tsx\nAuthProvider + TradeConfigProvider + BrowserRouter"]
+        pages["Pages\nMarket, Chart, Login, CoinDCX, MT5, Trade Log, WebSocket"]
+        sharedUi["Shared UI\nHeader, Loading, ErrorMessage"]
+        authStore["AuthContext\napiKey/apiSecret/isAuthenticated"]
+        tradeStore["TradeConfigContext\ncoindcx + mt5 profiles"]
+        apiLayer["api.ts\napiService + apiClient + publicApiClient"]
+        localStorageNode["Browser localStorage\ncredentials + trade profiles"]
+        chartLibs["Client libraries\nECharts, lucide-react, React Router"]
+    end
+
+    subgraph apiTier["Backend API Host"]
+        springApi["Spring Boot REST API\npublic, futures, websocket, trade-log endpoints"]
+    end
+
+    browser --> entry
+    entry --> appShell
+    appShell --> pages
+    appShell --> authStore
+    appShell --> tradeStore
+    pages --> sharedUi
+    pages --> apiLayer
+    pages --> chartLibs
+    authStore <--> localStorageNode
+    tradeStore <--> localStorageNode
+    apiLayer -->|apiClient adds X-API-KEY and X-API-SECRET| springApi
+    apiLayer -->|publicApiClient without user auth headers| springApi
+
+    classDef userNode fill:#f3e0e4,stroke:#af3654,color:#1f2a37;
+    classDef appNode fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef serviceNode fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    class user,browser userNode;
+    class entry,appShell,pages,sharedUi,authStore,tradeStore,chartLibs appNode;
+    class apiLayer,localStorageNode,springApi serviceNode;
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>3. Build And Delivery View</h2>
+            <p>
+                Build-time packaging is simple: TypeScript compilation and Vite bundling produce static frontend assets that can be served by a static host or preview server, while runtime API calls still target the configured backend origin.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for build and delivery deployment diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart LR
+    subgraph buildInputs["Build Inputs"]
+        tsSrc["src/*.tsx + src/*.ts"]
+        cssAssets["App.css + index.css"]
+        envConfig["Environment variables\nVITE_API_BASE_URL"]
+        viteBuildCfg["Vite + TypeScript build config"]
+    end
+
+    subgraph buildPipeline["Build Pipeline"]
+        tsc["tsc\nType checking / emit prep"]
+        viteBuild["vite build\nmodule bundling + asset optimization"]
+    end
+
+    subgraph delivery["Frontend Delivery Target"]
+        staticAssets["Built static assets\nindex.html + JS + CSS bundles"]
+        staticHost["Static host or vite preview\nserves SPA files"]
+    end
+
+    subgraph runtimeDeps["Runtime Dependency"]
+        browserUser["End-user browser"]
+        apiHost["Configured backend API host\nhttp://localhost:8080 by default"]
+    end
+
+    tsSrc --> tsc
+    cssAssets --> viteBuild
+    envConfig --> viteBuild
+    viteBuildCfg --> tsc
+    viteBuildCfg --> viteBuild
+    tsc --> viteBuild
+    viteBuild --> staticAssets
+    staticAssets --> staticHost
+    staticHost --> browserUser
+    browserUser --> apiHost
+
+    classDef input fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef pipeline fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    classDef output fill:#f3e0e4,stroke:#af3654,color:#1f2a37;
+    class tsSrc,cssAssets,envConfig,viteBuildCfg input;
+    class tsc,viteBuild pipeline;
+    class staticAssets,staticHost,browserUser,apiHost output;
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Source focus: package.json, vite.config.ts, README.md, .env, and src/services/api.ts. Deployment facts shown here are limited to what the frontend repository declares explicitly.
+        </div>
+    </main>
+</body>
+</html>

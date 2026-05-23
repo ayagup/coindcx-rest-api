@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Frontend Component Diagram</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f4ef;
+            --panel: rgba(255, 252, 247, 0.97);
+            --ink: #1f2a37;
+            --muted: #5b6472;
+            --border: #d8d0c3;
+            --brand-deep: #2f4767;
+            --brand-red: #af3654;
+            --brand-sand: #efe5d8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(175, 54, 84, 0.14), transparent 24%),
+                radial-gradient(circle at top right, rgba(47, 71, 103, 0.12), transparent 22%),
+                linear-gradient(180deg, #f2ece3 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1540px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(54, 49, 39, 0.12);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3.2vw, 3.3rem);
+            line-height: 1.02;
+            letter-spacing: -0.02em;
+            color: var(--brand-deep);
+        }
+
+        .intro {
+            margin: 0;
+            max-width: 90ch;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #394352;
+        }
+
+        .badge {
+            align-self: start;
+            padding: 12px 16px;
+            border: 1px solid rgba(175, 54, 84, 0.22);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(175, 54, 84, 0.08), rgba(47, 71, 103, 0.05));
+            font-size: 0.92rem;
+            color: var(--brand-deep);
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255, 250, 244, 0.98) 0%, rgba(249, 244, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.24rem, 2vw, 1.9rem);
+            color: var(--brand-deep);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 84ch;
+            line-height: 1.62;
+            color: #45505f;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid rgba(47, 71, 103, 0.32);
+            background: linear-gradient(180deg, #fff8f3 0%, #eadfd1 100%);
+            color: var(--brand-deep);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.08);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.13);
+        }
+
+        .toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: #fffdf8;
+            cursor: grab;
+            touch-action: none;
+            scroll-behavior: auto;
+        }
+
+        .diagram-shell.is-panning {
+            cursor: grabbing;
+            user-select: none;
+        }
+
+        .mermaid {
+            min-width: 1020px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+
+        .hint {
+            margin: 0 0 10px;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#efe5d8",
+                primaryTextColor: "#1f2a37",
+                primaryBorderColor: "#6b7c92",
+                lineColor: "#64748b",
+                secondaryColor: "#faf4eb",
+                tertiaryColor: "#f5ede1",
+                clusterBkg: "#faf3ea",
+                clusterBorder: "#a8a39b",
+                fontFamily: "Aptos, Segoe UI, sans-serif"
+            },
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: "basis"
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function zoomAtPoint(card, nextZoom, clientX, clientY) {
+            const shell = card.querySelector(".diagram-shell");
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!shell || !mermaidNode) {
+                return;
+            }
+
+            const currentZoom = Number(mermaidNode.dataset.zoom || 1);
+            const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+            if (clampedZoom === currentZoom) {
+                return;
+            }
+
+            const shellRect = shell.getBoundingClientRect();
+            const offsetX = clientX - shellRect.left + shell.scrollLeft;
+            const offsetY = clientY - shellRect.top + shell.scrollTop;
+            const focusRatioX = offsetX / currentZoom;
+            const focusRatioY = offsetY / currentZoom;
+
+            applyZoom(card, clampedZoom);
+
+            shell.scrollLeft = Math.max(0, focusRatioX * clampedZoom - (clientX - shellRect.left));
+            shell.scrollTop = Math.max(0, focusRatioY * clampedZoom - (clientY - shellRect.top));
+        }
+
+        function attachPanHandlers(card, shell) {
+            let pointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+
+            const stopPan = () => {
+                pointerId = null;
+                shell.classList.remove("is-panning");
+            };
+
+            shell.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                const svg = shell.querySelector("svg");
+                if (!svg) {
+                    return;
+                }
+
+                pointerId = event.pointerId;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = shell.scrollLeft;
+                startScrollTop = shell.scrollTop;
+                shell.classList.add("is-panning");
+                shell.setPointerCapture(event.pointerId);
+                event.preventDefault();
+            });
+
+            shell.addEventListener("pointermove", (event) => {
+                if (pointerId !== event.pointerId) {
+                    return;
+                }
+
+                shell.scrollLeft = startScrollLeft - (event.clientX - startX);
+                shell.scrollTop = startScrollTop - (event.clientY - startY);
+            });
+
+            shell.addEventListener("pointerup", (event) => {
+                if (pointerId === event.pointerId) {
+                    shell.releasePointerCapture(event.pointerId);
+                    stopPan();
+                }
+            });
+
+            shell.addEventListener("pointercancel", stopPan);
+            shell.addEventListener("lostpointercapture", stopPan);
+        }
+
+        function attachWheelZoom(card, shell, mermaidNode) {
+            shell.addEventListener("wheel", (event) => {
+                if (!event.ctrlKey && !event.metaKey) {
+                    return;
+                }
+
+                event.preventDefault();
+                const direction = event.deltaY < 0 ? STEP : -STEP;
+                const nextZoom = Number(mermaidNode.dataset.zoom || 1) + direction;
+                zoomAtPoint(card, nextZoom, event.clientX, event.clientY);
+            }, { passive: false });
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const shell = card.querySelector(".diagram-shell");
+            if (!mermaidNode || !shell) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                attachPanHandlers(card, shell);
+                attachWheelZoom(card, shell, mermaidNode);
+
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div>
+                <h1>React Frontend Component Diagram</h1>
+                <p class="intro">
+                    This diagram set maps the actual structure of the React/Vite frontend: the application shell and routing,
+                    shared state providers, page-level feature modules, and the Axios service layer that talks to the Spring Boot backend.
+                    It focuses on the real modules present in the current codebase rather than generated or planned screens.
+                </p>
+            </div>
+            <div class="badge">React 18 + TypeScript + Vite<br/>Routing, contexts, market/trading pages</div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>1. App Shell And Routing</h2>
+            <p>
+                Main entry composition from main.tsx into App.tsx, the provider stack, router, header, protected routes, and top-level pages.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for app shell diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart LR
+    root["main.tsx\nReactDOM.createRoot"] --> app["App.tsx"]
+    app --> authProvider["AuthProvider"]
+    authProvider --> tradeProvider["TradeConfigProvider"]
+    tradeProvider --> router["BrowserRouter"]
+    router --> routes["AppRoutes"]
+    routes --> header["Header"]
+    routes --> protected["ProtectedRoute"]
+
+    subgraph publicPages["Public Pages"]
+        market["MarketPage"]
+        chart["ChartPage"]
+        login["LoginPage"]
+        wsPage["WebSocketPage"]
+        config["TradeConfigPage"]
+        tradeLog["TradeLogPage"]
+    end
+
+    subgraph tradingPages["Trading Pages"]
+        dcxTrading["CoinDCXTradingPage"]
+        mt5Trading["MT5TradingPage"]
+        ordersPlaceholder["Orders / Margin / Wallet / Account\nplaceholder pages"]
+        apiLogsPlaceholder["API Logs placeholder"]
+    end
+
+    header --> market
+    header --> dcxTrading
+    header --> mt5Trading
+    header --> tradeLog
+    header --> config
+    header --> wsPage
+    header --> login
+
+    routes --> market
+    routes --> chart
+    routes --> login
+    routes --> dcxTrading
+    routes --> mt5Trading
+    routes --> config
+    routes --> tradeLog
+    routes --> wsPage
+    protected --> ordersPlaceholder
+    routes --> apiLogsPlaceholder
+    login -. redirects after auth .-> market
+
+    classDef shell fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef page fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    class root,app,authProvider,tradeProvider,router,routes,header,protected shell;
+    class market,chart,login,wsPage,config,tradeLog,dcxTrading,mt5Trading,ordersPlaceholder,apiLogsPlaceholder page;
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. State, Services, And Shared Components</h2>
+            <p>
+                Shared state providers depend on browser localStorage, while the service layer wraps two Axios clients and exposes page-facing API methods.
+                Shared UI primitives are reused across the data-heavy pages.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for state and services diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart TB
+    subgraph stateLayer["State Layer"]
+        authCtx["AuthContext\napiKey / apiSecret / isAuthenticated\nlogin() / logout()"]
+        tradeCtx["TradeConfigContext\ncoindcxConfig / mt5Config\nupdateConfig() / resetConfig()"]
+        storage["Browser localStorage\napiKey, apiSecret, tradeConfig, tradeConfig_mt5"]
+    end
+
+    subgraph sharedUi["Shared UI Components"]
+        header["Header"]
+        loading["Loading"]
+        error["ErrorMessage"]
+    end
+
+    subgraph serviceLayer["Service Layer"]
+        apiService["apiService\nendpoint wrappers"]
+        apiClient["apiClient\nAxios instance\nauthenticated requests"]
+        publicClient["publicApiClient\nAxios instance\npublic requests"]
+    end
+
+    subgraph typesLayer["Shared Types"]
+        types["types/index.ts\nTicker, Order, FuturesPosition,\nBalance, ApiCallLog, AuthContextType"]
+    end
+
+    backend["Spring Boot Backend\nVITE_API_BASE_URL\ndefault http://localhost:8080"]
+
+    authCtx <--> storage
+    tradeCtx <--> storage
+    header --> authCtx
+
+    apiService --> apiClient
+    apiService --> publicClient
+    apiClient --> storage
+    apiClient --> backend
+    publicClient --> backend
+
+    loading --> types
+    error --> types
+    authCtx --> types
+    apiService --> types
+
+    classDef state fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef service fill:#f4ebe0,stroke:#8b6e63,color:#1f2a37;
+    classDef ui fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    classDef ext fill:#f3e0e4,stroke:#af3654,color:#1f2a37;
+    class authCtx,tradeCtx,storage state;
+    class apiService,apiClient,publicClient,types service;
+    class header,loading,error ui;
+    class backend ext;
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>3. Page Feature Modules</h2>
+            <p>
+                Representative feature modules across the frontend: market discovery, charting, CoinDCX/MT5 trading, configuration, and monitoring pages.
+                The links reflect actual imports and API usage patterns in the current pages.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for feature modules diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart LR
+    subgraph marketModule["Market Discovery"]
+        market["MarketPage\nspot / futures / mt5 tabs\nsearch + refresh"]
+        chart["ChartPage\nReactECharts\nmulti-timeframe chart"]
+    end
+
+    subgraph tradingModule["Trading"]
+        dcxTrading["CoinDCXTradingPage\npositions / orders / trade-log tabs"]
+        mt5Trading["MT5TradingPage\nMT5 contracts + balances"]
+        tradeConfig["TradeConfigPage\nCoinDCX + MT5 profiles"]
+        login["LoginPage\ncredential capture"]
+    end
+
+    subgraph monitoringModule["Monitoring"]
+        wsPage["WebSocketPage\nstatus + messages monitor"]
+        tradeLog["TradeLogPage\ntrade lifecycle explorer"]
+    end
+
+    sharedLoading["Loading"]
+    sharedError["ErrorMessage"]
+    tradeCtx["useTradeConfig()"]
+    authCtx["useAuth()"]
+    apiService["apiService / publicApiClient"]
+    reactCharts["ECharts + echarts-for-react"]
+    backend["Spring Boot API + WebSocket data endpoints"]
+
+    market --> apiService
+    market --> sharedLoading
+    market --> sharedError
+    market --> chart
+
+    chart --> apiService
+    chart --> reactCharts
+    chart --> sharedLoading
+    chart --> sharedError
+
+    dcxTrading --> apiService
+    dcxTrading --> tradeCtx
+    dcxTrading --> sharedLoading
+    dcxTrading --> sharedError
+    mt5Trading --> apiService
+    mt5Trading --> tradeCtx
+    tradeConfig --> tradeCtx
+    login --> authCtx
+
+    wsPage --> apiService
+    wsPage --> sharedLoading
+    wsPage --> sharedError
+    tradeLog --> apiService
+    tradeLog --> sharedLoading
+    tradeLog --> sharedError
+
+    apiService --> backend
+
+    classDef module fill:#efe5d8,stroke:#5d7087,color:#1f2a37;
+    classDef shared fill:#faf4eb,stroke:#9c978d,color:#1f2a37;
+    classDef infra fill:#f3e0e4,stroke:#af3654,color:#1f2a37;
+    class market,chart,dcxTrading,mt5Trading,tradeConfig,login,wsPage,tradeLog module;
+    class sharedLoading,sharedError,tradeCtx,authCtx,apiService,reactCharts shared;
+    class backend infra;
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Source focus: App.tsx, main.tsx, Header.tsx, AuthContext.tsx, TradeConfigContext.tsx, api.ts, MarketPage.tsx,
+            ChartPage.tsx, CoinDCXTradingPage.tsx, MT5TradingPage.tsx, TradeConfigPage.tsx, TradeLogPage.tsx, WebSocketPage.tsx, and types/index.ts.
+        </div>
+    </main>
+</body>
+</html>

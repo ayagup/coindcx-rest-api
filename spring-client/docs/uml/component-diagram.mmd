@@ -1,0 +1,102 @@
+flowchart LR
+    subgraph clients["Clients"]
+        frontend["React Frontend / External API Consumers"]
+    end
+
+    subgraph http["Spring MVC Interface"]
+        filter["HttpLoggingFilter"]
+        ctrlTrading["Trading Controllers\nFuturesController, OrderController,\nMarginController, LendController"]
+        ctrlAccount["Account & Market Controllers\nUserController, WalletController, PublicController"]
+        ctrlWs["WebSocket Query Controllers\nWebSocketDataController, WebSocketSubscriptionController,\nWebSocketFutures*Controller, WebSocketSpot*Controller"]
+        ctrlMonitoring["Monitoring Controllers\nApiCallLogController, FuturesTradeLogController,\nHelloController"]
+        openapi["OpenApiConfig / Swagger UI"]
+        cors["CorsConfig"]
+    end
+
+    subgraph app["Application Services"]
+        boot["SpringClientApplication\n@EnableAsync\n@EnableScheduling\n@EnableFeignClients"]
+        svcTrading["Trading Services\nFuturesService, OrderService,\nMarginService, LendService"]
+        svcAccount["Account & Market Services\nUserService, WalletService, PublicService"]
+        svcWs["CoinDCXWebSocketService\nSocket.IO connection, subscriptions,\nevent routing"]
+        svcPersist["WebSocketDataPersistenceService\nCentral async persistence hub"]
+        svcParse["FuturesInstrumentPriceParsingService"]
+        svcCleanup["WebSocketDataCleanupService\nScheduled retention cleanup"]
+        svcMetaTrader["MetaTraderService"]
+        svcMetaTraderSymbols["MetaTraderSymbolService\nMetaTraderSymbolInitializerService"]
+        svcLogs["ApiCallLogService\nFuturesTradeLogService"]
+        aspect["ApiCallLoggingAspect\nAround *Service.*(..)"]
+    end
+
+    subgraph integration["Integration Clients & Config"]
+        restClients["Generated CoinDCX REST clients\napi/*, ApiClient, request interceptors"]
+        feign["MetaTraderClient\n@FeignClient"]
+        wsConfig["WebSocketConfig"]
+    end
+
+    subgraph persistence["Persistence Layer"]
+        repoWs["WebSocket repositories\nspot, futures, balances, candles,\npositions, orderbook, prices"]
+        repoBiz["Business repositories\nApiCallLogRepository, FuturesTradeLogRepository,\nMetaTraderSymbolRepository"]
+        dao["ApiCallLogDao"]
+        mysql[("MySQL\ncoindcx schema")]
+    end
+
+    subgraph externals["External Systems"]
+        coindcxRest["CoinDCX REST API"]
+        coindcxWs["CoinDCX WebSocket Stream\nwss://stream.coindcx.com"]
+        mt5["MetaTrader 5 REST Gateway\nhttp://localhost:5000"]
+    end
+
+    frontend --> filter
+    filter --> ctrlTrading
+    filter --> ctrlAccount
+    filter --> ctrlWs
+    filter --> ctrlMonitoring
+
+    openapi -. documents .-> ctrlTrading
+    openapi -. documents .-> ctrlAccount
+    openapi -. documents .-> ctrlWs
+    cors -. applies to .-> ctrlTrading
+    cors -. applies to .-> ctrlAccount
+    cors -. applies to .-> ctrlWs
+
+    ctrlTrading --> svcTrading
+    ctrlTrading --> svcMetaTrader
+    ctrlTrading --> svcMetaTraderSymbols
+    ctrlAccount --> svcAccount
+    ctrlWs --> repoWs
+    ctrlWs --> svcWs
+    ctrlWs --> svcParse
+    ctrlMonitoring --> svcLogs
+    ctrlMonitoring --> repoBiz
+
+    svcTrading --> restClients
+    svcAccount --> restClients
+    restClients --> coindcxRest
+
+    svcMetaTrader --> feign
+    feign --> mt5
+    svcMetaTrader --> svcMetaTraderSymbols
+    svcMetaTraderSymbols --> repoBiz
+
+    svcWs --> wsConfig
+    svcWs --> coindcxWs
+    svcWs --> svcPersist
+    svcPersist --> repoWs
+    svcPersist --> svcParse
+    svcPersist --> svcLogs
+    svcCleanup --> repoWs
+    svcCleanup --> repoBiz
+
+    aspect -. intercepts .-> svcTrading
+    aspect -. intercepts .-> svcAccount
+    aspect -. intercepts .-> svcWs
+    aspect -. intercepts .-> svcMetaTrader
+    aspect -. intercepts .-> svcLogs
+    aspect --> dao
+    dao --> repoBiz
+
+    repoWs --> mysql
+    repoBiz --> mysql
+    boot --> svcPersist
+    boot --> svcCleanup
+    boot --> feign

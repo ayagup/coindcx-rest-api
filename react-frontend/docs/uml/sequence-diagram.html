@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Frontend Sequence Diagram</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f4ef;
+            --panel: rgba(255, 252, 247, 0.97);
+            --ink: #1f2a37;
+            --muted: #5b6472;
+            --border: #d8d0c3;
+            --brand-deep: #2f4767;
+            --brand-red: #af3654;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(175, 54, 84, 0.14), transparent 24%),
+                radial-gradient(circle at top right, rgba(47, 71, 103, 0.12), transparent 22%),
+                linear-gradient(180deg, #f2ece3 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1560px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(54, 49, 39, 0.12);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3.2vw, 3.3rem);
+            line-height: 1.02;
+            letter-spacing: -0.02em;
+            color: var(--brand-deep);
+        }
+
+        .intro {
+            margin: 0;
+            max-width: 92ch;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #394352;
+        }
+
+        .badge {
+            align-self: start;
+            padding: 12px 16px;
+            border: 1px solid rgba(175, 54, 84, 0.22);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(175, 54, 84, 0.08), rgba(47, 71, 103, 0.05));
+            font-size: 0.92rem;
+            color: var(--brand-deep);
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255, 250, 244, 0.98) 0%, rgba(249, 244, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.24rem, 2vw, 1.9rem);
+            color: var(--brand-deep);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 86ch;
+            line-height: 1.62;
+            color: #45505f;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid rgba(47, 71, 103, 0.32);
+            background: linear-gradient(180deg, #fff8f3 0%, #eadfd1 100%);
+            color: var(--brand-deep);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.08);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.13);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .hint {
+            margin: 0 0 10px;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: #fffdf8;
+            cursor: grab;
+            touch-action: none;
+            scroll-behavior: auto;
+        }
+
+        .diagram-shell.is-panning {
+            cursor: grabbing;
+            user-select: none;
+        }
+
+        .mermaid {
+            min-width: 1080px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#efe5d8",
+                primaryTextColor: "#1f2a37",
+                primaryBorderColor: "#6b7c92",
+                lineColor: "#64748b",
+                secondaryColor: "#faf4eb",
+                tertiaryColor: "#f5ede1",
+                actorBorder: "#5d7087",
+                actorBkg: "#efe5d8",
+                actorTextColor: "#1f2a37",
+                signalColor: "#445164",
+                signalTextColor: "#1f2a37",
+                noteBkgColor: "#fbf4e9",
+                noteBorderColor: "#b7a99a",
+                activationBorderColor: "#7d8ea3",
+                activationBkgColor: "#e8eef6",
+                fontFamily: "Aptos, Segoe UI, sans-serif"
+            },
+            sequence: {
+                useMaxWidth: false,
+                wrap: true,
+                diagramMarginX: 40,
+                diagramMarginY: 30,
+                noteMargin: 12,
+                boxMargin: 18,
+                actorMargin: 60,
+                width: 230,
+                height: 72,
+                messageMargin: 36
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function zoomAtPoint(card, nextZoom, clientX, clientY) {
+            const shell = card.querySelector(".diagram-shell");
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!shell || !mermaidNode) {
+                return;
+            }
+
+            const currentZoom = Number(mermaidNode.dataset.zoom || 1);
+            const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+            if (clampedZoom === currentZoom) {
+                return;
+            }
+
+            const shellRect = shell.getBoundingClientRect();
+            const offsetX = clientX - shellRect.left + shell.scrollLeft;
+            const offsetY = clientY - shellRect.top + shell.scrollTop;
+            const focusRatioX = offsetX / currentZoom;
+            const focusRatioY = offsetY / currentZoom;
+
+            applyZoom(card, clampedZoom);
+
+            shell.scrollLeft = Math.max(0, focusRatioX * clampedZoom - (clientX - shellRect.left));
+            shell.scrollTop = Math.max(0, focusRatioY * clampedZoom - (clientY - shellRect.top));
+        }
+
+        function attachPanHandlers(shell) {
+            let pointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+
+            const stopPan = () => {
+                pointerId = null;
+                shell.classList.remove("is-panning");
+            };
+
+            shell.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                if (!shell.querySelector("svg")) {
+                    return;
+                }
+
+                pointerId = event.pointerId;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = shell.scrollLeft;
+                startScrollTop = shell.scrollTop;
+                shell.classList.add("is-panning");
+                shell.setPointerCapture(event.pointerId);
+                event.preventDefault();
+            });
+
+            shell.addEventListener("pointermove", (event) => {
+                if (pointerId !== event.pointerId) {
+                    return;
+                }
+                shell.scrollLeft = startScrollLeft - (event.clientX - startX);
+                shell.scrollTop = startScrollTop - (event.clientY - startY);
+            });
+
+            shell.addEventListener("pointerup", (event) => {
+                if (pointerId === event.pointerId) {
+                    shell.releasePointerCapture(event.pointerId);
+                    stopPan();
+                }
+            });
+
+            shell.addEventListener("pointercancel", stopPan);
+            shell.addEventListener("lostpointercapture", stopPan);
+        }
+
+        function attachWheelZoom(card, shell, mermaidNode) {
+            shell.addEventListener("wheel", (event) => {
+                if (!event.ctrlKey && !event.metaKey) {
+                    return;
+                }
+                event.preventDefault();
+                const direction = event.deltaY < 0 ? STEP : -STEP;
+                zoomAtPoint(card, Number(mermaidNode.dataset.zoom || 1) + direction, event.clientX, event.clientY);
+            }, { passive: false });
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const shell = card.querySelector(".diagram-shell");
+            if (!mermaidNode || !shell) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                attachPanHandlers(shell);
+                attachWheelZoom(card, shell, mermaidNode);
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div>
+                <h1>React Frontend Sequence Diagram</h1>
+                <p class="intro">
+                    These sequences show how the React application boots, restores state from localStorage, loads market and chart data,
+                    coordinates the CoinDCX trading dashboard, and inspects backend WebSocket activity. The flows are based on the current
+                    page and context implementations in the frontend codebase.
+                </p>
+            </div>
+            <div class="badge">App shell, market data, trading flow,<br/>and WebSocket monitoring</div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>1. App Bootstrap And Login Flow</h2>
+            <p>
+                App startup restores stored API credentials, routes the user, and lets LoginPage write fresh credentials back through AuthContext.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for auth sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor User
+    participant Main as main.tsx
+    participant App as App.tsx
+    participant Auth as AuthProvider
+    participant Storage as localStorage
+    participant Router as React Router
+    participant RouteGuard as ProtectedRoute
+    participant Login as LoginPage
+    participant Header as Header
+
+    User->>Main: Open frontend application
+    Main->>App: Render root component
+    App->>Auth: Mount provider tree
+    Auth->>Storage: getItem("apiKey"), getItem("apiSecret")
+    Storage-->>Auth: Stored credentials or null
+
+    alt Credentials found
+        Auth-->>App: set apiKey/apiSecret and isAuthenticated=true
+    else No credentials
+        Auth-->>App: keep anonymous state
+    end
+
+    App->>Router: Resolve current route
+    Router->>Header: Render navigation shell
+    Header->>Auth: useAuth()
+    Auth-->>Header: isAuthenticated state
+
+    alt User opens protected route while unauthenticated
+        Router->>RouteGuard: Render protected element
+        RouteGuard->>Auth: useAuth()
+        Auth-->>RouteGuard: isAuthenticated=false
+        RouteGuard-->>Router: Navigate to /login
+        Router->>Login: Render login form
+    else Public route or authenticated session
+        Router-->>User: Render target page
+    end
+
+    User->>Login: Submit API key and secret
+    Login->>Auth: login(apiKey, apiSecret)
+    Auth->>Storage: setItem("apiKey"), setItem("apiSecret")
+    Auth-->>Login: set isAuthenticated=true
+    Login->>Router: navigate("/")
+    Router-->>User: MarketPage becomes active
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. Market Discovery And Chart Data Flow</h2>
+            <p>
+                MarketPage bootstraps instrument and price data, then hands off to ChartPage, which fetches persisted spot or futures series and refreshes on an interval.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for market and chart sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor User
+    participant Market as MarketPage
+    participant Api as apiService
+    participant AuthClient as apiClient
+    participant PublicClient as publicApiClient
+    participant Backend as Spring Boot API
+    participant Chart as ChartPage
+    participant ECharts as ReactECharts
+
+    User->>Market: Open MarketPage
+    Market->>Api: fetchMarkets()
+    Api->>PublicClient: getActiveFuturesInstruments()
+    PublicClient->>Backend: GET /api/futures/instruments/active
+    Backend-->>PublicClient: futures list
+    PublicClient-->>Api: response
+    Api-->>Market: instrument payload
+    Market->>Market: merge backend futures with MT5_CONTRACTS
+
+    par Bulk spot data
+        Market->>Api: getMarketsDetails()
+        Api->>AuthClient: GET /api/public/markets_details
+        AuthClient->>Backend: fetch spot market details
+        Backend-->>AuthClient: markets_details[]
+        AuthClient-->>Api: response
+        Api-->>Market: fulfilled spot result
+        Market->>Market: build spotData map
+    and Bulk futures prices
+        Market->>Api: getFuturesCurrentPricesPublic()
+        Api->>AuthClient: GET /api/websocket/futures-current-prices/latest
+        AuthClient->>Backend: fetch latest futures prices
+        Backend-->>AuthClient: prices JSON string/object
+        AuthClient-->>Api: response
+        Api-->>Market: fulfilled futures result
+        Market->>Market: build futuresData map
+    end
+
+    Market-->>User: Render cards and set 10s refresh interval
+    User->>Market: Click a market card
+    Market->>Chart: navigate(/chart/:marketType/:symbol)
+
+    Chart->>Api: getSpotMarketData(...) or getFuturesMarketData(...)
+    Api->>AuthClient: GET /api/websocket/data/spot|futures/*
+    AuthClient->>Backend: query persisted WebSocket data
+    Backend-->>AuthClient: tick or OHLCV records
+    AuthClient-->>Api: response
+    Api-->>Chart: response.data
+
+    alt OHLCV response already present
+        Chart->>Chart: mapOHLCV(response.data)
+    else Tick response only
+        Chart->>Chart: filter markPrice ticks and aggregateTicks(active timeframe)
+    end
+
+    Chart->>ECharts: setOption(buildOption(...))
+    ECharts-->>User: Render chart, indicators, and timeframe controls
+    Note over Chart: useEffect triggers initial fetch, 30s refresh, and timeframe re-fetch
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>3. CoinDCX Trading Dashboard And Order Placement</h2>
+            <p>
+                CoinDCXTradingPage hydrates balances, positions, orders, trade log, and live price data, then submits an order followed by TP/SL instructions using the server-side public futures endpoints.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for trading sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor User
+    participant Trading as CoinDCXTradingPage
+    participant Config as TradeConfigContext
+    participant Api as apiService
+    participant AuthClient as apiClient
+    participant PublicClient as publicApiClient
+    participant Backend as Spring Boot API
+
+    User->>Trading: Open /futures or switch contract
+    Trading->>Config: useTradeConfig()
+    Config-->>Trading: coindcxConfig (margin, leverage, TP, SL)
+
+    Trading->>Api: fetchAll(true)
+    par Dashboard balance and leverage
+        Trading->>Api: getWsCurrentBalance("USDT")
+        Api->>PublicClient: GET /api/websocket/balance-update/currency/USDT/current
+        PublicClient->>Backend: query latest balance snapshot
+        Backend-->>PublicClient: futures + mt5 balance payload
+        Trading->>Api: getFuturesLeverage()
+        Api->>AuthClient: GET /api/futures/leverage
+        AuthClient->>Backend: fetch leverage metadata
+        Backend-->>AuthClient: leverage response
+    and Open positions and orders
+        Trading->>Api: getWsPositionsByStatus("open")
+        Api->>PublicClient: GET /api/websocket/futures-position-update/status/open
+        PublicClient->>Backend: query open positions
+        Backend-->>PublicClient: open positions list
+        Trading->>Api: getWsOrdersByPairAndStatus(contract, "open")
+        Api->>PublicClient: GET /api/websocket/futures-order-update/pair/{pair}/status/open
+        PublicClient->>Backend: query open orders
+        Backend-->>PublicClient: open orders list
+    and Trade log summary
+        Trading->>Api: getWsRecentOrders(200)
+        Api->>PublicClient: GET /api/websocket/futures-order-update/recent/200
+        PublicClient->>Backend: fetch recent order events
+        Backend-->>PublicClient: recent orders
+        Trading->>Api: getWsTotalUnrealizedPnl()
+        Api->>PublicClient: GET /api/websocket/futures-position-update/total-unrealized-pnl
+        PublicClient->>Backend: fetch unrealized PnL totals
+        Backend-->>PublicClient: PnL map
+    end
+    Trading-->>User: Render balances, positions, orders, and trade log tabs
+
+    Trading->>Api: getFuturesInstrumentPriceLatest(contract)
+    Api->>AuthClient: GET /api/websocket/futures-instrument-prices/instrument/{contract}/latest
+    AuthClient->>Backend: fetch per-instrument price
+    Backend-->>AuthClient: markPrice or ask/bid payload
+    alt Missing direct mark price
+        Trading->>Api: getFuturesCurrentPricesPublic()
+        Api->>AuthClient: GET /api/websocket/futures-current-prices/latest
+        AuthClient->>Backend: fetch bulk current prices
+        Backend-->>AuthClient: prices JSON string/object
+    end
+    Trading-->>User: Show latest price and auto-fill quantity helpers
+
+    User->>Trading: Click Place Order
+    Trading->>Trading: resolve quantity and compute TP1, TP2, TP3, SL
+    alt Market order without cached price
+        Trading->>Api: getFuturesMarketDataPublic(contract, 20)
+        Api->>PublicClient: GET /api/websocket/data/futures/{contract}
+        PublicClient->>Backend: fetch recent futures ticks
+        Backend-->>PublicClient: recent price rows
+    end
+
+    Trading->>Api: createFuturesOrderPublic(payload)
+    Api->>PublicClient: POST /api/futures/orders/create
+    PublicClient->>Backend: create futures order
+    Backend-->>PublicClient: created order payload
+    PublicClient-->>Api: order response
+    Api-->>Trading: order data
+
+    loop Retry until position becomes active
+        Trading->>Api: createTpSlPublic(TP1 payload)
+        Api->>PublicClient: POST /api/futures/positions/create-tpsl
+        PublicClient->>Backend: attach TP1 to active position
+        Backend-->>PublicClient: success or "no active/pending" error
+    end
+
+    Trading->>Api: createTpSlPublic(SL payload)
+    Api->>PublicClient: POST /api/futures/positions/create-tpsl
+    Trading->>Api: createTpSlPublic(TP2 payload)
+    Api->>PublicClient: POST /api/futures/positions/create-tpsl
+    Trading->>Api: createTpSlPublic(TP3 payload)
+    Api->>PublicClient: POST /api/futures/positions/create-tpsl
+    PublicClient->>Backend: apply remaining protective orders
+    Backend-->>PublicClient: per-call success or failure
+    Trading->>Api: fetchAll()
+    Trading-->>User: Refresh dashboard and show order status message
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>4. WebSocket Monitor Flow</h2>
+            <p>
+                WebSocketPage polls connection status, lets the user inspect captured event messages, and clears per-event or global message buffers through backend REST endpoints.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for websocket monitor sequence diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+sequenceDiagram
+    autonumber
+    actor User
+    participant Monitor as WebSocketPage
+    participant Api as apiService
+    participant Client as apiClient
+    participant Backend as Spring Boot API
+
+    User->>Monitor: Open WebSocketPage
+    Monitor->>Api: getWebSocketStatus()
+    Api->>Client: GET /api/websocket/status
+    Client->>Backend: fetch connection state and storage stats
+    Backend-->>Client: status, subscribedChannels, storageStats
+    Client-->>Api: response
+    Api-->>Monitor: status payload
+    Monitor-->>User: Render connection card, storage stats, channel list
+
+    Note over Monitor: useEffect refreshes status every 10 seconds
+
+    User->>Monitor: Select event type
+    Monitor->>Api: getWebSocketMessages(selectedEvent)
+    Api->>Client: GET /api/websocket/messages?event=...
+    Client->>Backend: fetch captured message buffer
+    Backend-->>Client: messages[]
+    Client-->>Api: response
+    Api-->>Monitor: messages payload
+    Monitor-->>User: Render up to first 50 messages
+
+    alt Clear one event buffer
+        User->>Monitor: Click Clear for selected event
+        Monitor->>Api: clearWebSocketMessages(event)
+        Api->>Client: DELETE /api/websocket/messages/clear?event=...
+        Client->>Backend: clear event buffer
+        Backend-->>Client: success
+        Monitor-->>User: Empty message list
+    else Clear all message buffers
+        User->>Monitor: Click Clear All
+        Monitor->>Api: clearAllWebSocketMessages()
+        Api->>Client: DELETE /api/websocket/messages/clear-all
+        Client->>Backend: clear all message buffers
+        Backend-->>Client: success
+        Monitor-->>User: Reset selected event and messages
+    end
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Source focus: App.tsx, AuthContext.tsx, LoginPage.tsx, MarketPage.tsx, ChartPage.tsx, CoinDCXTradingPage.tsx,
+            TradeConfigContext.tsx, TradeConfigPage.tsx, WebSocketPage.tsx, and services/api.ts.
+        </div>
+    </main>
+</body>
+</html>

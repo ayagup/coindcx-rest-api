@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Frontend Class Diagram</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f4ef;
+            --panel: rgba(255, 252, 247, 0.97);
+            --ink: #1f2a37;
+            --muted: #5b6472;
+            --border: #d8d0c3;
+            --brand-deep: #2f4767;
+            --brand-red: #af3654;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(175, 54, 84, 0.14), transparent 24%),
+                radial-gradient(circle at top right, rgba(47, 71, 103, 0.12), transparent 22%),
+                linear-gradient(180deg, #f2ece3 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1560px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(54, 49, 39, 0.12);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 20px;
+            align-items: end;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3.2vw, 3.3rem);
+            line-height: 1.02;
+            letter-spacing: -0.02em;
+            color: var(--brand-deep);
+        }
+
+        .intro {
+            margin: 0;
+            max-width: 92ch;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #394352;
+        }
+
+        .badge {
+            align-self: start;
+            padding: 12px 16px;
+            border: 1px solid rgba(175, 54, 84, 0.22);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(175, 54, 84, 0.08), rgba(47, 71, 103, 0.05));
+            font-size: 0.92rem;
+            color: var(--brand-deep);
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255, 250, 244, 0.98) 0%, rgba(249, 244, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.24rem, 2vw, 1.9rem);
+            color: var(--brand-deep);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 86ch;
+            line-height: 1.62;
+            color: #45505f;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid rgba(47, 71, 103, 0.32);
+            background: linear-gradient(180deg, #fff8f3 0%, #eadfd1 100%);
+            color: var(--brand-deep);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.08);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.13);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .hint {
+            margin: 0 0 10px;
+            font-size: 0.92rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: #fffdf8;
+            cursor: grab;
+            touch-action: none;
+            scroll-behavior: auto;
+        }
+
+        .diagram-shell.is-panning {
+            cursor: grabbing;
+            user-select: none;
+        }
+
+        .mermaid {
+            min-width: 1100px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#efe5d8",
+                primaryTextColor: "#1f2a37",
+                primaryBorderColor: "#6b7c92",
+                lineColor: "#64748b",
+                secondaryColor: "#faf4eb",
+                tertiaryColor: "#f5ede1",
+                classText: "#1f2a37",
+                fillType0: "#efe5d8",
+                fillType1: "#f9f1e5",
+                fillType2: "#f4ebe0",
+                fillType3: "#f3e0e4",
+                fontFamily: "Aptos, Segoe UI, sans-serif"
+            },
+            class: {
+                useMaxWidth: false
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function zoomAtPoint(card, nextZoom, clientX, clientY) {
+            const shell = card.querySelector(".diagram-shell");
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!shell || !mermaidNode) {
+                return;
+            }
+
+            const currentZoom = Number(mermaidNode.dataset.zoom || 1);
+            const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+            if (clampedZoom === currentZoom) {
+                return;
+            }
+
+            const shellRect = shell.getBoundingClientRect();
+            const offsetX = clientX - shellRect.left + shell.scrollLeft;
+            const offsetY = clientY - shellRect.top + shell.scrollTop;
+            const focusRatioX = offsetX / currentZoom;
+            const focusRatioY = offsetY / currentZoom;
+
+            applyZoom(card, clampedZoom);
+
+            shell.scrollLeft = Math.max(0, focusRatioX * clampedZoom - (clientX - shellRect.left));
+            shell.scrollTop = Math.max(0, focusRatioY * clampedZoom - (clientY - shellRect.top));
+        }
+
+        function attachPanHandlers(shell) {
+            let pointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+
+            const stopPan = () => {
+                pointerId = null;
+                shell.classList.remove("is-panning");
+            };
+
+            shell.addEventListener("pointerdown", (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                if (!shell.querySelector("svg")) {
+                    return;
+                }
+
+                pointerId = event.pointerId;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = shell.scrollLeft;
+                startScrollTop = shell.scrollTop;
+                shell.classList.add("is-panning");
+                shell.setPointerCapture(event.pointerId);
+                event.preventDefault();
+            });
+
+            shell.addEventListener("pointermove", (event) => {
+                if (pointerId !== event.pointerId) {
+                    return;
+                }
+                shell.scrollLeft = startScrollLeft - (event.clientX - startX);
+                shell.scrollTop = startScrollTop - (event.clientY - startY);
+            });
+
+            shell.addEventListener("pointerup", (event) => {
+                if (pointerId === event.pointerId) {
+                    shell.releasePointerCapture(event.pointerId);
+                    stopPan();
+                }
+            });
+
+            shell.addEventListener("pointercancel", stopPan);
+            shell.addEventListener("lostpointercapture", stopPan);
+        }
+
+        function attachWheelZoom(card, shell, mermaidNode) {
+            shell.addEventListener("wheel", (event) => {
+                if (!event.ctrlKey && !event.metaKey) {
+                    return;
+                }
+                event.preventDefault();
+                const direction = event.deltaY < 0 ? STEP : -STEP;
+                zoomAtPoint(card, Number(mermaidNode.dataset.zoom || 1) + direction, event.clientX, event.clientY);
+            }, { passive: false });
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const shell = card.querySelector(".diagram-shell");
+            if (!mermaidNode || !shell) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    applyZoom(card, clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM));
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                attachPanHandlers(shell);
+                attachWheelZoom(card, shell, mermaidNode);
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div>
+                <h1>React Frontend Class Diagram</h1>
+                <p class="intro">
+                    This class-diagram view models the frontend using the TypeScript interfaces, provider contracts, service objects, and React components that exist in the current codebase.
+                    Because the app is function-component driven rather than class-based, the diagrams focus on interface structure and dependency relationships rather than inheritance-heavy OO design.
+                </p>
+            </div>
+            <div class="badge">TypeScript interfaces, React components,<br/>contexts, and Axios service objects</div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>1. Application Shell And Providers</h2>
+            <p>
+                App.tsx composes the provider tree, router shell, route guard, shared header, and page components. Auth and trade configuration are exposed through context contracts rather than class instances.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for application shell class diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+classDiagram
+    direction LR
+
+    class App {
+                  +render() void
+    }
+
+    class AppRoutes {
+                  +renderRoutes() void
+    }
+
+    class ProtectedRoute {
+                  +ReactNode children
+                  +render() void
+    }
+
+    class Header {
+                  +renderNavigation() void
+    }
+
+                class MarketPage
+                class ChartPage
+                class LoginPage
+                class CoinDCXTradingPage
+                class MT5TradingPage
+                class TradeConfigPage
+                class TradeLogPage
+                class WebSocketPage
+
+    class AuthProvider {
+                  +String apiKey
+                  +String apiSecret
+                  +Boolean isAuthenticated
+                  +login(apiKey, apiSecret) void
+                  +logout() void
+    }
+
+    class TradeConfigProvider {
+                  +TradeConfig coindcxConfig
+                  +TradeConfig mt5Config
+                  +updateConfig(updates, profile) void
+                  +resetConfig(profile) void
+    }
+
+    class AuthContextType {
+                  +String apiKey
+                  +String apiSecret
+                  +Boolean isAuthenticated
+                  +login(apiKey, apiSecret) void
+                  +logout() void
+    }
+
+    class TradeConfig {
+                  +Number marginUsdt
+                  +Number leverage
+                  +Number tp1Pips
+                  +Number tp2Pips
+                  +Number tp3Pips
+                  +Number slPips
+                  +Number quantity
+    }
+
+                class BrowserRouter
+                class LocalStorage
+
+    App *-- AuthProvider : wraps
+    App *-- TradeConfigProvider : wraps
+    App *-- BrowserRouter : mounts
+    BrowserRouter *-- AppRoutes : renders
+    AppRoutes *-- Header : includes
+    AppRoutes *-- MarketPage
+    AppRoutes *-- ChartPage
+    AppRoutes *-- LoginPage
+    AppRoutes *-- CoinDCXTradingPage
+    AppRoutes *-- MT5TradingPage
+    AppRoutes *-- TradeConfigPage
+    AppRoutes *-- TradeLogPage
+    AppRoutes *-- WebSocketPage
+    AppRoutes *-- ProtectedRoute : guards selected routes
+    ProtectedRoute ..> AuthContextType : reads via useAuth()
+    Header ..> AuthContextType : reads/logout
+    AuthProvider ..> AuthContextType : provides
+    AuthProvider ..> LocalStorage : persists credentials
+    TradeConfigProvider ..> TradeConfig : manages
+    TradeConfigProvider ..> LocalStorage : persists profiles
+    TradeConfigPage ..> TradeConfig : edits
+    CoinDCXTradingPage ..> TradeConfig : reads
+    MT5TradingPage ..> TradeConfig : reads
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. Service Layer And Page Dependencies</h2>
+            <p>
+                The frontend centralizes backend access in api.ts through two Axios instances and a large apiService object. Pages depend on that object rather than embedding transport logic directly.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for service layer class diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+classDiagram
+    direction LR
+
+    class apiService {
+                  +getMarketsDetails() Promise
+                  +getActiveFuturesInstruments() Promise
+                  +getSpotMarketData(marketPair, limit, timeframe) Promise
+                  +getFuturesMarketData(contractSymbol, limit, timeframe) Promise
+                  +getFuturesInstrumentPriceLatest(instrument) Promise
+                  +getFuturesCurrentPricesPublic() Promise
+                  +createFuturesOrderPublic(orderData) Promise
+                  +createTpSlPublic(data) Promise
+                  +cancelFuturesOrderPublic(orderId) Promise
+                  +closeFuturesPositionPublic(data) Promise
+                  +getWebSocketStatus() Promise
+                  +getWebSocketMessages(event) Promise
+                  +clearWebSocketMessages(event) Promise
+                  +clearAllWebSocketMessages() Promise
+    }
+
+    class apiClient {
+                  +String baseUrl
+                  +requestInterceptor() void
+                  +responseInterceptor() void
+    }
+
+    class publicApiClient {
+                  +String baseUrl
+    }
+
+    class MarketPage {
+                  +fetchMarkets() Promise
+                  +fetchMarketData() Promise
+    }
+
+    class ChartPage {
+                  +fetchChartData(tf) Promise
+                  +buildOption(data, timeframe, indicators, msbobSettings, divSettings) Object
+    }
+
+    class CoinDCXTradingPage {
+                  +fetchAll(showLoad) Promise
+                  +fetchLatestPrice(contract) Promise
+                  +handlePlaceOrder() Promise
+                  +handleCancelOrder(orderId) Promise
+                  +handleClosePosition(pos) Promise
+    }
+
+    class MT5TradingPage {
+                  +fetchAll(showLoad) Promise
+                  +handlePlaceOrder() Promise
+    }
+
+    class TradeLogPage {
+                  +fetchEntries() Promise
+                  +fetchStats() Promise
+    }
+
+    class WebSocketPage {
+                  +fetchStatus() Promise
+                  +fetchMessages(event) Promise
+                  +handleClearMessages(event) Promise
+                  +handleClearAllMessages() Promise
+    }
+
+    class SpringBootBackend {
+                  +publicApiEndpoints() void
+                  +futuresApiEndpoints() void
+                  +websocketEndpoints() void
+                  +tradeLogEndpoints() void
+    }
+
+                class LocalStorage
+
+    apiService --> apiClient : authenticated calls
+    apiService --> publicApiClient : public calls
+    apiClient --> LocalStorage : reads auth headers
+    apiClient --> SpringBootBackend : HTTP
+    publicApiClient --> SpringBootBackend : HTTP
+    MarketPage ..> apiService : uses
+    ChartPage ..> apiService : uses
+    CoinDCXTradingPage ..> apiService : uses
+    MT5TradingPage ..> apiService : uses
+    WebSocketPage ..> apiService : uses
+    TradeLogPage ..> publicApiClient : uses directly
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>3. Shared Type Contracts</h2>
+            <p>
+                Shared domain interfaces live in types/index.ts and are reused across the application shell, API responses, and component prop contracts.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for shared types class diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+classDiagram
+    direction TB
+
+    class Ticker {
+                  +String market
+                  +String last_price
+                  +String bid
+                  +String ask
+                  +String high
+                  +String low
+                  +String volume
+                  +Number timestamp
+    }
+
+    class Market {
+                  +String symbol
+                  +String base_currency_short_name
+                  +String target_currency_short_name
+                  +String status
+    }
+
+    class Trade {
+                  +String price
+                  +String quantity
+                  +Number timestamp
+                  +String side
+    }
+
+    class OrderBookEntry {
+                  +String price
+                  +String quantity
+    }
+
+    class OrderBook {
+                  +OrderBookEntry bids
+                  +OrderBookEntry asks
+    }
+
+    class Order {
+                  +String id
+                  +String market
+                  +String side
+                  +String order_type
+                  +String price
+                  +String quantity
+                  +String filled_quantity
+                  +String status
+    }
+
+    class CreateOrderRequest {
+                  +String market
+                  +String side
+                  +String order_type
+                  +String priceOptional
+                  +String quantity
+                  +String client_order_id_optional
+    }
+
+                class SharedFuturesPosition {
+                  +String id
+                  +String market
+                  +String side
+                  +String entry_price
+                  +String current_price
+                  +String quantity
+                  +Number leverage
+                  +String margin
+                  +String unrealized_pnl
+                  +String liquidation_price
+    }
+
+                class SharedFuturesOrder {
+                  +String id
+                  +String market
+                  +String side
+                  +String order_type
+                  +String price
+                  +String quantity
+                  +String status
+    }
+
+    class Balance {
+                  +String currency
+                  +String available_balance
+                  +String locked_balance
+                  +String total_balance
+    }
+
+    class UserInfo {
+                  +String id
+                  +String email
+                  +String name
+                  +Boolean verified
+                  +String created_at
+    }
+
+    class ApiCallLog {
+                  +String id
+                  +String endpoint
+                  +String method
+                  +Number status_code
+                  +Number response_time
+                  +String timestamp
+                  +String error_message_optional
+    }
+
+    class ApiCallStats {
+                  +Number total_calls
+                  +Number successful_calls
+                  +Number failed_calls
+                  +Number average_response_time
+                  +String slowest_endpoint
+                  +String most_called_endpoint
+    }
+
+    class TickerCardProps {
+                  +Ticker ticker
+    }
+
+    class OrderFormProps {
+                  +String market
+                  +onOrderCreated() void
+    }
+
+    class OrderListProps {
+                  +Order orders
+                  +onCancelOrder(orderId) void
+    }
+
+    OrderBook *-- OrderBookEntry
+    TickerCardProps --> Ticker
+    OrderFormProps --> CreateOrderRequest : creates
+    OrderListProps --> Order : lists
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>4. Page-Local View Models And Analysis Types</h2>
+            <p>
+                Several pages define their own view models for chart aggregation, trade-log summarization, WebSocket monitoring, and trading forms. Those local interfaces are central to how the UI transforms backend payloads.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for page local models class diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <p class="hint">Drag inside the diagram to pan. Use Ctrl + mouse wheel to zoom at the pointer.</p>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+classDiagram
+    direction LR
+
+    class MarketData {
+                  +String market
+                  +String price
+                  +String volumeOptional
+                  +String highOptional
+                  +String lowOptional
+                  +String timestampOptional
+                  +String openOptional
+                  +String closeOptional
+    }
+
+    class Timeframe {
+                  +String label
+                  +Number seconds
+    }
+
+    class OHLCVBar {
+                  +Number time
+                  +Number open
+                  +Number high
+                  +Number low
+                  +Number close
+                  +Number volumeOptional
+    }
+
+    class DivSettings {
+                  +Number prd
+                  +String source
+                  +String searchdiv
+                  +Number showlimit
+                  +Boolean showlines
+                  +Boolean calcmacd
+                  +Boolean calcrsi
+    }
+
+    class MSBOBSettings {
+                  +Boolean showZigZag
+                  +Boolean showOrderBlocks
+                  +Boolean showBreakers
+                  +Number pivotLength
+    }
+
+                class TradingOrderForm {
+                  +String contract
+                  +String side
+                  +String orderType
+                  +String quantity
+                  +String price
+    }
+
+                class TradingTradeLogEntry {
+                  +String positionIdOptional
+                  +String pair
+                  +String side
+                  +String status
+                  +Number entryPriceOptional
+                  +Number exitPriceOptional
+                  +Number quantityOptional
+                  +Number realizedPnlOptional
+                  +Number roiOptional
+    }
+
+                class TradingBalance {
+                  +String currencyShortNameOptional
+                  +Number balanceOptional
+                  +Number lockedBalanceOptional
+                  +Number availableBalanceOptional
+    }
+
+    class Mt5Balance {
+                  +Number balanceOptional
+                  +Number equityOptional
+                  +Number freeMarginOptional
+                  +Number leverageOptional
+                  +Number profitOptional
+    }
+
+                class TradingFuturesPosition {
+                  +String marketOptional
+                  +String pairOptional
+                  +String sideOptional
+                  +Number sizeOptional
+                  +Number entryPriceOptional
+                  +Number markPriceOptional
+                  +Number unrealizedPnlOptional
+    }
+
+                class TradingFuturesOrder {
+                  +String idOptional
+                  +String orderIdOptional
+                  +String marketOptional
+                  +String pairOptional
+                  +String sideOptional
+                  +String orderTypeOptional
+                  +String statusOptional
+    }
+
+    class FuturesTradeLog {
+                  +Number idOptional
+                  +String eventTypeOptional
+                  +String pairOptional
+                  +String positionIdOptional
+                  +String orderIdOptional
+                  +Number quantityOptional
+                  +Number priceOptional
+                  +Number triggerPriceOptional
+                  +String rawDataOptional
+    }
+
+    class PositionSummary {
+                  +String positionId
+                  +String pair
+                  +String side
+                  +Number entryPrice
+                  +Number exitPrice
+                  +Number quantity
+                  +Number pnl
+                  +String status
+                  +Number eventCount
+                  +FuturesTradeLog events
+                  +Number tpPrice
+                  +Number slPrice
+    }
+
+    class WebSocketStatus {
+                  +Boolean connected
+                  +String status
+                  +String subscribedChannels
+                  +Object storageStats
+    }
+
+    class WebSocketMessage {
+                  +String event
+                  +Object data
+                  +String timestamp
+    }
+
+    class ErrorMessageProps {
+                  +String message
+                  +onClose() void
+    }
+
+    class ErrorMessage {
+                  +render(message, onClose) void
+    }
+
+    class Loading {
+                  +render() void
+    }
+
+                class MarketPage
+                class ChartPage
+                class CoinDCXTradingPage
+                class MT5TradingPage
+                class TradeLogPage
+                class WebSocketPage
+
+    PositionSummary *-- FuturesTradeLog
+    ErrorMessage --> ErrorMessageProps
+    MarketPage ..> MarketData
+    ChartPage ..> Timeframe
+    ChartPage ..> OHLCVBar
+    ChartPage ..> DivSettings
+    ChartPage ..> MSBOBSettings
+    CoinDCXTradingPage ..> TradingOrderForm
+    CoinDCXTradingPage ..> TradingTradeLogEntry
+    CoinDCXTradingPage ..> TradingBalance
+    CoinDCXTradingPage ..> Mt5Balance
+    CoinDCXTradingPage ..> TradingFuturesPosition
+    CoinDCXTradingPage ..> TradingFuturesOrder
+    MT5TradingPage ..> TradingOrderForm
+    MT5TradingPage ..> TradingTradeLogEntry
+    MT5TradingPage ..> Mt5Balance
+    TradeLogPage ..> FuturesTradeLog
+    TradeLogPage ..> PositionSummary
+    WebSocketPage ..> WebSocketStatus
+    WebSocketPage ..> WebSocketMessage
+    MarketPage ..> Loading
+    MarketPage ..> ErrorMessage
+    ChartPage ..> Loading
+    ChartPage ..> ErrorMessage
+    CoinDCXTradingPage ..> Loading
+    CoinDCXTradingPage ..> ErrorMessage
+    TradeLogPage ..> Loading
+    TradeLogPage ..> ErrorMessage
+    WebSocketPage ..> Loading
+    WebSocketPage ..> ErrorMessage
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Source focus: App.tsx, AuthContext.tsx, TradeConfigContext.tsx, Header.tsx, Loading.tsx, ErrorMessage.tsx,
+            types/index.ts, MarketPage.tsx, ChartPage.tsx, CoinDCXTradingPage.tsx, MT5TradingPage.tsx, TradeLogPage.tsx, and WebSocketPage.tsx.
+        </div>
+    </main>
+</body>
+</html>

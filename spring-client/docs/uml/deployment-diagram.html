@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Client Deployment Diagram</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4efe6;
+            --panel: rgba(255, 252, 245, 0.96);
+            --ink: #1f2937;
+            --muted: #5b6472;
+            --border: #d8ccb8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(154, 79, 61, 0.16), transparent 26%),
+                linear-gradient(180deg, #efe6d7 0%, var(--bg) 100%);
+        }
+
+        .page {
+            width: min(1520px, calc(100vw - 32px));
+            margin: 24px auto;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(75, 55, 28, 0.12);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3vw, 3.2rem);
+            line-height: 1.05;
+            letter-spacing: 0.015em;
+        }
+
+        .intro {
+            margin: 0 0 24px;
+            max-width: 86ch;
+            font-size: 1rem;
+            line-height: 1.65;
+            color: #344054;
+        }
+
+        .diagram-card {
+            margin-top: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(250, 245, 236, 0.98) 100%);
+        }
+
+        .diagram-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.25rem, 2vw, 1.9rem);
+        }
+
+        .diagram-card p {
+            margin: 0 0 14px;
+            max-width: 82ch;
+            line-height: 1.6;
+            color: #3f4956;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            border: 1px solid #8f6e4b;
+            background: linear-gradient(180deg, #fffaf2 0%, #eadfc9 100%);
+            color: var(--ink);
+            border-radius: 999px;
+            padding: 10px 16px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 120ms ease;
+            box-shadow: 0 4px 14px rgba(75, 55, 28, 0.1);
+        }
+
+        .toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(75, 55, 28, 0.14);
+        }
+
+        .toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .zoom-level {
+            min-width: 72px;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        .diagram-shell {
+            overflow: auto;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: #fffdf8;
+        }
+
+        .mermaid {
+            min-width: 1040px;
+        }
+
+        .mermaid svg {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 22px;
+            font-size: 0.94rem;
+            color: var(--muted);
+        }
+    </style>
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "base",
+            themeVariables: {
+                primaryColor: "#f3e6d0",
+                primaryTextColor: "#1f2937",
+                primaryBorderColor: "#8f6e4b",
+                lineColor: "#7b5a3c",
+                secondaryColor: "#fff8ef",
+                tertiaryColor: "#f7efe1",
+                clusterBkg: "#fbf5ea",
+                clusterBorder: "#b89470",
+                fontFamily: "Georgia, Times New Roman, serif"
+            },
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: "basis"
+            }
+        });
+
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 4;
+        const STEP = 0.2;
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function getSvgBaseSize(svg) {
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const parts = viewBox.trim().split(/\s+/).map(Number);
+                if (parts.length === 4 && Number.isFinite(parts[2]) && Number.isFinite(parts[3])) {
+                    return { width: parts[2], height: parts[3] };
+                }
+            }
+
+            const widthAttr = Number.parseFloat(svg.getAttribute("width") || "");
+            const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+            if (Number.isFinite(widthAttr) && Number.isFinite(heightAttr)) {
+                return { width: widthAttr, height: heightAttr };
+            }
+
+            const rect = svg.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+        }
+
+        function applyZoom(card, zoom) {
+            const mermaidNode = card.querySelector(".mermaid");
+            const svg = mermaidNode?.querySelector("svg");
+            if (!mermaidNode || !svg) {
+                return;
+            }
+
+            const baseSize = getSvgBaseSize(svg);
+            svg.style.width = `${Math.round(baseSize.width * zoom)}px`;
+            svg.style.height = `${Math.round(baseSize.height * zoom)}px`;
+            mermaidNode.dataset.zoom = String(zoom);
+
+            const label = card.querySelector(".zoom-level");
+            if (label) {
+                label.textContent = `${Math.round(zoom * 100)}%`;
+            }
+        }
+
+        function bindDiagramCard(card) {
+            const mermaidNode = card.querySelector(".mermaid");
+            if (!mermaidNode) {
+                return;
+            }
+
+            const setup = () => {
+                const svg = mermaidNode.querySelector("svg");
+                if (!svg || card.dataset.bound === "true") {
+                    return Boolean(svg);
+                }
+
+                const syncZoom = () => applyZoom(card, Number(mermaidNode.dataset.zoom || 1));
+                syncZoom();
+                requestAnimationFrame(syncZoom);
+                window.setTimeout(syncZoom, 120);
+
+                card.querySelector("[data-action='zoom-in']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) + STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-out']")?.addEventListener("click", () => {
+                    const nextZoom = clamp(Number(mermaidNode.dataset.zoom || 1) - STEP, MIN_ZOOM, MAX_ZOOM);
+                    applyZoom(card, nextZoom);
+                });
+
+                card.querySelector("[data-action='zoom-reset']")?.addEventListener("click", () => {
+                    applyZoom(card, 1);
+                });
+
+                card.dataset.bound = "true";
+                return true;
+            };
+
+            if (setup()) {
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (setup()) {
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(mermaidNode, { childList: true, subtree: true });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".diagram-card").forEach(bindDiagramCard);
+        });
+    </script>
+</head>
+<body>
+    <main class="page">
+        <h1>Spring Client Deployment Diagram</h1>
+        <p class="intro">
+            This deployment view uses the runtime endpoints and ports configured by the codebase and repository instructions:
+            the Spring Boot service on port 8080, MySQL on port 3306, the MetaTrader 5 REST gateway on port 5000,
+            and CoinDCX external REST and WebSocket endpoints. The React frontend is shown as the primary client tier
+            because the repository is structured as a three-tier system even though this page lives under the Spring module.
+        </p>
+
+        <section class="diagram-card">
+            <h2>1. Runtime Deployment Topology</h2>
+            <p>
+                Main deployment view for local development and runtime operation. It shows the browser/frontend tier,
+                the Spring Boot JVM, local persistence and logs, and external exchange and MT5 integrations.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for runtime deployment diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart LR
+    subgraph workstation["Developer Workstation / Local Host"]
+        subgraph clientTier["Client Tier"]
+            browser["Browser"]
+            react["React/Vite Frontend\nPort 3000\nCharts, trading UI, WS data viewer"]
+        end
+
+        subgraph appHost["Spring Boot Runtime"]
+            boot["Spring Boot 3.2 / Java 17\nPort 8080"]
+
+            subgraph appModules["In-Process Modules"]
+                api["REST Controllers\n/api/**\n/swagger-ui.html\n/actuator"]
+                ws["CoinDCXWebSocketService\nSocket.IO client\nauto-subscription"]
+                persist["WebSocketDataPersistenceService\n@Async save* pipelines"]
+                cleanup["WebSocketDataCleanupService\nScheduled retention cleanup"]
+                mt5svc["MetaTraderService\nOpenFeign integration"]
+                logAspect["ApiCallLoggingAspect\nservice-call logging"]
+            end
+
+            logs["Application Logs\nlogs/coindcx-api.log"]
+        end
+
+        subgraph dataTier["Local Data Tier"]
+            mysql[("MySQL 8\nlocalhost:3306\nSchema: coindcx")]
+        end
+
+        subgraph sidecar["Auxiliary Local Service"]
+            mt5gw["MetaTrader 5 REST Gateway\nhttp://localhost:5000"]
+        end
+    end
+
+    subgraph external["External Services"]
+        coindcxRest["CoinDCX REST API\nHTTPS"]
+        coindcxWs["CoinDCX WebSocket Stream\nwss://stream.coindcx.com"]
+    end
+
+    browser --> react
+    react -->|HTTP JSON + auth headers| api
+    browser -->|direct access for docs/health| api
+
+    api --> boot
+    boot --> ws
+    boot --> persist
+    boot --> cleanup
+    boot --> mt5svc
+    boot --> logAspect
+
+    persist -->|JPA writes/reads| mysql
+    cleanup -->|delete old websocket rows| mysql
+    logAspect -->|ApiCallLog + metrics| mysql
+    boot -->|file logging| logs
+
+    ws -->|Socket.IO subscription + market events| coindcxWs
+    api -->|generated REST client calls| coindcxRest
+    mt5svc -->|OpenFeign HTTP| mt5gw
+
+    classDef node fill:#f8efe0,stroke:#8f6e4b,color:#1f2937;
+    classDef store fill:#f1e5ca,stroke:#8f6e4b,color:#1f2937;
+    class browser,react,boot,api,ws,persist,cleanup,mt5svc,logAspect,mt5gw,coindcxRest,coindcxWs node;
+    class mysql,logs store;
+                </div>
+            </div>
+        </section>
+
+        <section class="diagram-card">
+            <h2>2. Spring Service Container View</h2>
+            <p>
+                Zoomed-in deployment view of the Spring Boot process itself. This emphasizes which responsibilities are deployed
+                together inside the same JVM and which infrastructure they depend on at runtime.
+            </p>
+            <div class="toolbar" aria-label="Zoom controls for spring container deployment diagram">
+                <button type="button" data-action="zoom-out">Zoom Out</button>
+                <button type="button" data-action="zoom-reset">Reset</button>
+                <button type="button" data-action="zoom-in">Zoom In</button>
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="diagram-shell">
+                <div class="mermaid" data-zoom="1">
+flowchart TB
+    subgraph spring["Spring Boot Application Container :8080"]
+        entry["HTTP Entry Points\n/api/**\n/swagger-ui.html\n/api-docs\n/actuator"]
+
+        subgraph services["Runtime Services"]
+            trading["Trading Services\nFuturesService, OrderService, MarginService, LendService"]
+            account["Account/Public Services\nUserService, WalletService, PublicService"]
+            wsIngest["CoinDCXWebSocketService"]
+            wsPersist["WebSocketDataPersistenceService"]
+            parser["FuturesInstrumentPriceParsingService"]
+            cleanupSvc["WebSocketDataCleanupService"]
+            mt5["MetaTraderService\nMetaTraderSymbolService"]
+            logging["ApiCallLoggingAspect\nHttpLoggingFilter"]
+        end
+
+        repos["JPA Repositories\nwebsocket_*\napi_call_logs\nfutures_trade_log\nmetatrader_symbols"]
+    end
+
+    db[("MySQL\ncoindcx")]
+    exchangeRest["CoinDCX REST API"]
+    exchangeWs["CoinDCX WebSocket Stream"]
+    gateway["MT5 Gateway :5000"]
+
+    entry --> trading
+    entry --> account
+    entry --> mt5
+    entry --> repos
+    logging -. intercepts / filters .-> trading
+    logging -. intercepts / filters .-> account
+    logging -. intercepts / filters .-> mt5
+    wsIngest --> wsPersist
+    wsPersist --> parser
+    trading --> repos
+    account --> repos
+    wsPersist --> repos
+    cleanupSvc --> repos
+    repos --> db
+    trading --> exchangeRest
+    account --> exchangeRest
+    wsIngest --> exchangeWs
+    mt5 --> gateway
+
+    classDef runtime fill:#f8efe0,stroke:#8f6e4b,color:#1f2937;
+    classDef infra fill:#f1e5ca,stroke:#8f6e4b,color:#1f2937;
+    class entry,trading,account,wsIngest,wsPersist,parser,cleanupSvc,mt5,logging,repos runtime;
+    class db,exchangeRest,exchangeWs,gateway infra;
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">
+            Deployment inputs came from application.properties, the repository architecture instructions, and the current Spring service wiring.
+            Older docs mention a Binance/Yahoo Finance poller, but that service is not present in the current Spring code and is intentionally omitted here.
+        </div>
+    </main>
+</body>
+</html>

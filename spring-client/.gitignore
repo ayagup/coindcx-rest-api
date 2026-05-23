@@ -39,3 +39,6 @@ mvnw.cmd
 
 **/*.md
 **/*.log
+
+
+spring-client/logs/
